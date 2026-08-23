@@ -1,8 +1,8 @@
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library';
 
-// We use the ID provided by the user in the prompt
-const SPREADSHEET_ID = '1waF1GLS6iB9JJ3pftQOSl1d27tRNUNhM245LlK_tUB0';
+// We use the ID provided by the user in the prompt or env
+const SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID || '1waF1GLS6iB9JJ3pftQOSl1d27tRNUNhM245LlK_tUB0';
 
 export async function getSpreadsheet() {
   if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
