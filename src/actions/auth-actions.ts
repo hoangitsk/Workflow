@@ -1,13 +1,27 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { adminAuth } from "../lib/firebase-admin";
+
 import { getSpreadsheet } from "../lib/sheets";
 
 export async function loginWithTokenAction(idToken: string) {
   try {
-    const decodedToken = await adminAuth.verifyIdToken(idToken);
-    const email = decodedToken.email;
+    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=AIzaSyBCDm2B4jkFJ-B62aOpVar9uxXlVxT3QDQ`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken })
+    });
+    
+    if (!res.ok) {
+      throw new Error("Xác thực token thất bại từ Google.");
+    }
+    
+    const data = await res.json();
+    if (!data.users || data.users.length === 0) {
+      throw new Error("Không lấy được thông tin người dùng từ token.");
+    }
+
+    const email = data.users[0].email;
     if (!email) throw new Error("Tài khoản Google này không có email.");
 
     const doc = await getSpreadsheet();
