@@ -265,13 +265,13 @@ export default function ClientApp({ initialMembers, initialChannels, initialIdea
   }, [ideas]);
 
   if (!currentMemberId) {
-    return <LoginScreen members={members} />;
+    return <LoginScreen />;
   }
 
   const actor = members.find((m: any) => m.id === currentMemberId);
   if (!actor) {
     // Session exists but user deleted?
-    return <LoginScreen members={members} />;
+    return <LoginScreen />;
   }
 
   const memberById = Object.fromEntries(members.map((m: any) => [m.id, m]));

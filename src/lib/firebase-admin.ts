@@ -1,11 +1,12 @@
-import * as admin from 'firebase-admin';
+import { getApps, initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 
-if (!admin.apps.length) {
+if (!getApps().length) {
   // To verify ID tokens, we only need the projectId. 
   // No full service account is needed if we are just doing token verification.
-  admin.initializeApp({
+  initializeApp({
     projectId: "yniemdienanh-fb0b7",
   });
 }
 
-export const adminAuth = admin.auth();
+export const adminAuth = getAuth();
