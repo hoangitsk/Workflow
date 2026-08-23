@@ -4,26 +4,8 @@ import { cookies } from "next/headers";
 
 import { getSpreadsheet } from "../lib/sheets";
 
-export async function loginWithTokenAction(idToken: string) {
+export async function loginWithCredentialsAction(email: string, phoneOrPassword: string) {
   try {
-    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=AIzaSyBCDm2B4jkFJ-B62aOpVar9uxXlVxT3QDQ`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken })
-    });
-    
-    if (!res.ok) {
-      throw new Error("Xác thực token thất bại từ Google.");
-    }
-    
-    const data = await res.json();
-    if (!data.users || data.users.length === 0) {
-      throw new Error("Không lấy được thông tin người dùng từ token.");
-    }
-
-    const email = data.users[0].email;
-    if (!email) throw new Error("Tài khoản Google này không có email.");
-
     const doc = await getSpreadsheet();
     const sheet = doc.sheetsByTitle["Members"];
     if (!sheet) throw new Error("Database thiếu tab 'Members'");
@@ -32,7 +14,23 @@ export async function loginWithTokenAction(idToken: string) {
     const member = rows.find(r => r.get('id') === email);
     
     if (!member) {
-      throw new Error(`Email ${email} chưa được cấp quyền. Liên hệ Core để thêm vào tab Members.`);
+      throw new Error(`Email ${email} chưa được cấp quyền.`);
+    }
+
+    const savedPassword = member.get('password');
+    const savedPhone = member.get('phone');
+
+    // Mật khẩu là cột 'password' (nếu có), hoặc 'phone' nếu cột password trống
+    const expectedPassword = (savedPassword && savedPassword.trim() !== "") 
+      ? savedPassword 
+      : savedPhone;
+
+    if (!expectedPassword || expectedPassword.trim() === "") {
+      throw new Error(`Tài khoản ${email} chưa thiết lập mật khẩu và số điện thoại. Hãy cập nhật trên Google Sheets.`);
+    }
+
+    if (expectedPassword !== phoneOrPassword) {
+      throw new Error("Sai mật khẩu (hoặc số điện thoại).");
     }
 
     const cookieStore = await cookies();
