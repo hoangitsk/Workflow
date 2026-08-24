@@ -13,17 +13,21 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "YNDA Workspace",
-  description: "Hệ thống quản lý sản xuất nội dung YNDA",
+  title: "Ý Niệm Điện Ảnh — Không Gian Quản Lý Sản Xuất",
+  description: "Hệ thống quản lý quy trình sản xuất nội dung Ý Niệm Điện Ảnh",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
-      lang="en"
+      lang="vi"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col bg-[#080B11] text-[#F8FAFC]">{children}</body>
     </html>
   );
 }
