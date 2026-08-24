@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# YNDA WORKFLOW NỘI BỘ (BẢN HOÀN CHỈNH v4)
 
-## Getting Started
+Hệ thống quản lý quy trình sản xuất nội dung số và portfolio cá nhân cho đội ngũ YNDA.
 
-First, run the development server:
+---
 
+## 🌟 TÍNH NĂNG CHÍNH
+
+1. **Bảo Mật & Xác Thực Thật (Server-Side Authorization)**:
+   - Phân quyền nghiêm ngặt theo vai trò (`Core`, `Editor - E`, `Producer - P`).
+   - Mọi hành động (nộp kịch bản, duyệt idea, nộp video, QA) đều được xác thực danh tính từ phiên đăng nhập thực tế, chặn vượt quyền ở server.
+2. **Cấu Trúc 2 Cấp (Kênh → Nền Tảng → Ý Tưởng)**:
+   - `ChannelGroup` (Kênh Chính, Kênh Phụ...) gắn với danh mục `Platform` mở (YouTube, TikTok, Facebook Reels...).
+   - Ý tưởng gắn trực tiếp với `PlatformChannel` tương ứng.
+3. **Quy Trình State Machine Chuẩn & Mô Tả Bắt Buộc**:
+   - `PITCH` → `ASSIGNMENT` → `SCRIPT` → `PRODUCTION` → `QA` → `COMPLETE`.
+   - Bắt buộc nhập `description` chi tiết khi nộp idea.
+   - Bắt buộc nhập `publishedLink` (link video đã xuất bản thật) khi QA hoàn thành.
+4. **Dashboard Cá Nhân "Việc Của Tôi Hôm Nay" (Mặc Định)**:
+   - Trả lời ngay cho mỗi thành viên: *Hôm nay làm gì, cho idea nào, hạn khi nào*.
+   - Tự động đẩy các việc trễ hạn lên đầu với viền đỏ cảnh báo.
+5. **Khung Trao Đổi Bình Luận (Threaded Comments)**:
+   - Trao đổi trực tiếp trong từng Idea mà không làm xáo trộn trạng thái nghiệp vụ.
+   - Tự động thông báo tới người liên quan và bắn tin nhắn vào Discord.
+6. **Gantt 2 Tầng & Lịch Đăng Bài**:
+   - **Gantt theo Kênh**: Nhóm các hàng theo nền tảng, điều hướng tháng linh hoạt.
+   - **Timeline Tổng**: Khung nhìn toàn bộ dự án trên 1 canvas duy nhất.
+   - **Lịch Đăng Bài (Content Calendar)**: Lên lịch đăng bài và hỗ trợ link nhúng Notion/Google Calendar.
+7. **Trung Tâm Thông Báo In-App (🔔) & Discord Webhook**:
+   - Nhận thông báo thời gian thực khi được giao việc, video cần QA, QA chưa đạt, nhắc tên trong bình luận.
+8. **Nhật Ký Thay Đổi Bất Biến (Audit Log) & Báo Cáo Tuần**:
+   - Lưu trữ toàn bộ lịch sử thao tác hệ thống.
+   - Báo cáo tuần tự động tổng hợp năng suất, tỷ lệ QA và gửi trực tiếp vào kênh Discord `#core`.
+9. **Portfolio Cá Nhân & Link Công Khai**:
+   - Tự động ghi nhận credit thật (Idea gốc, Kịch bản, Biên tập, Sản xuất, QA).
+   - Trang `/portfolio/[memberId]` công khai cho phép ứng viên gửi nhà tuyển dụng.
+
+---
+
+## 🚀 HƯỚNG DẪN CHẠY & TRIỂN KHAI
+
+### 1. Cài đặt và chạy Local
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+Truy cập [http://localhost:3000](http://localhost:3000).
+
+### 2. Khởi tạo cơ sở dữ liệu (Google Sheets)
+```bash
+node init-sheet.mjs
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 3. Triển khai Vercel (Production)
+Chạy script tự động:
+```bat
+deploy.bat
+```
+Hoặc liên kết Git repository với Vercel và cấu hình các biến môi trường:
+- `GOOGLE_SERVICE_ACCOUNT_EMAIL`
+- `GOOGLE_PRIVATE_KEY`
+- `GOOGLE_SPREADSHEET_ID`
+- `DISCORD_WEBHOOK_URL` (tuỳ chọn)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
+*Phát triển bởi đội ngũ YNDA.*
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

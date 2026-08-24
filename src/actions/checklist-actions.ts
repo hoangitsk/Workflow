@@ -2,7 +2,7 @@
 
 import { getSpreadsheet } from "../lib/sheets";
 import { getCurrentMember } from "./auth-actions";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import crypto from "crypto";
 
 export async function createChecklistAction(name: string) {
@@ -20,6 +20,7 @@ export async function createChecklistAction(name: string) {
     createdByEmail: member.id,
   });
 
+  revalidateTag('sheets');
   revalidatePath("/");
 }
 
@@ -37,7 +38,27 @@ export async function updateChecklistStatusAction(id: string, newStatus: string)
 
   row.set('status', newStatus);
   await row.save();
-  
+  revalidateTag('sheets');
+  revalidatePath("/");
+}
+
+export async function updateChecklistDetailsAction(id: string, assignedToEmail?: string, dueDate?: string) {
+  const member = await getCurrentMember();
+  if (!member) throw new Error("Chưa đăng nhập");
+
+  const doc = await getSpreadsheet();
+  const sheet = doc.sheetsByTitle["Checklists"];
+  if (!sheet) throw new Error("Thiếu tab Checklists");
+
+  const rows = await sheet.getRows();
+  const row = rows.find(r => r.get('id') === id);
+  if (!row) throw new Error("Không tìm thấy việc");
+
+  if (assignedToEmail !== undefined) row.set('assignedToEmail', assignedToEmail);
+  if (dueDate !== undefined) row.set('dueDate', dueDate);
+
+  await row.save();
+  revalidateTag('sheets');
   revalidatePath("/");
 }
 
@@ -58,5 +79,6 @@ export async function deleteChecklistAction(id: string) {
   }
 
   await row.delete();
+  revalidateTag('sheets');
   revalidatePath("/");
 }

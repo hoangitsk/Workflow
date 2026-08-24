@@ -16,7 +16,7 @@ import { loginWithCredentialsAction, logoutAction } from "../../actions/auth-act
 import { 
   submitIdeaAction, approveIdeaAction, submitScriptAction, startProductionAction, 
   submitVideoAction, qaPassAction, qaFailAction, deleteIdeaAction, cancelIdeaAction,
-  archiveUnselectedIdeasAction, restoreArchivedIdeaAction, updateScheduledPostDateAction, triggerDailyCronAction
+  archiveUnselectedIdeasAction, restoreArchivedIdeaAction, updateScheduledPostDateAction
 } from "../../actions/idea-actions";
 import { 
   createChannelGroupAction, archiveChannelGroupAction, restoreChannelGroupAction, 
@@ -28,19 +28,6 @@ import { markNotificationAsReadAction, markAllNotificationsAsReadAction } from "
 import { sendWeeklyReportToDiscordAction } from "../../actions/report-actions";
 import { createChecklistAction, updateChecklistStatusAction, deleteChecklistAction } from "../../actions/checklist-actions";
 import { Member, Platform, ChannelGroup, PlatformChannel, Idea, CommentItem, AuditLogItem, NotificationItem, ChecklistItem, AppSettings, Role } from "../../lib/types";
-
-
-function UserAvatar({ name, size = 22, className = '' }: { name: string, size?: number, className?: string }) {
-  if (!name) return null;
-  const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const colors = [C.teal, C.amber, C.red, C.violet, C.blue, C.green];
-  const color = colors[hash % colors.length];
-  return (
-    <div className={className} style={{ width: size, height: size, borderRadius: '50%', background: color + '33', color: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.5, fontWeight: 'bold' }}>
-      {name[0]?.toUpperCase()}
-    </div>
-  );
-}
 
 /* ---------------------------------------------------------------------
    THEME TOKENS & CONSTANTS
@@ -342,18 +329,6 @@ export default function ClientApp({
   const [showProfile, setShowProfile] = useState<Member | null>(null);
   const [editProfile, setEditProfile] = useState<Member | null>(null);
   const [showNotificationsFlyout, setShowNotificationsFlyout] = useState(false);
-  const [notificationPage, setNotificationPage] = useState(1);
-  const notificationsRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
-        setShowNotificationsFlyout(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [submitScriptTarget, setSubmitScriptTarget] = useState<Idea | null>(null);
   const [submitVideoTarget, setSubmitVideoTarget] = useState<Idea | null>(null);
@@ -368,7 +343,6 @@ export default function ClientApp({
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [filterAssignee, setFilterAssignee] = useState("ALL");
   const [filterOverdueOnly, setFilterOverdueOnly] = useState(false);
-  const [sortMode, setSortMode] = useState("newest");
   const [boardSubTab, setBoardSubTab] = useState<"active" | "archived">("active");
 
   // Gantt & Calendar State
@@ -392,20 +366,6 @@ export default function ClientApp({
   }
 
   const actor = members.find(m => m.id === currentMemberId);
-
-  // CRON CLIENT TRIGGER (E1, E3)
-  useEffect(() => {
-    if (actor) {
-      const today = new Date().toISOString().slice(0, 10);
-      const lastRun = localStorage.getItem(`cron_${actor.id}`);
-      if (lastRun !== today) {
-        runAction(triggerDailyCronAction).then(() => {
-          localStorage.setItem(`cron_${actor.id}`, today);
-        }).catch(err => console.error("Cron failed", err));
-      }
-    }
-  }, [actor]);
-
   if (!actor) {
     return <LoginScreen />;
   }
@@ -423,40 +383,6 @@ export default function ClientApp({
   const unreadNotifications = notifications.filter(n => n.memberId === actor.id && !n.read);
 
   // Router for auto-refresh
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setShowNewIdea(false);
-        setApproveIdeaTarget(null);
-        setQaCompleteIdeaTarget(null);
-        setQaRejectIdeaTarget(null);
-        setSchedulePostTarget(null);
-        setCancelIdeaTarget(null);
-        setShowNewChannel(false);
-        setShowNewPlatform(false);
-        setShowNewMember(false);
-        setShowSettingsModal(false);
-        setConfirmDeleteChannel(null);
-        setShowProfile(null);
-        setEditProfile(null);
-        setShowNotificationsFlyout(false);
-        setShowChangePassword(false);
-        setSubmitScriptTarget(null);
-        setSubmitVideoTarget(null);
-        setReassignIdeaTarget(null);
-        setEditIdeaTarget(null);
-        setExtendDeadlineTarget(null);
-      }
-      if (e.ctrlKey && e.key === 'n') {
-        e.preventDefault();
-        setShowNewIdea(true);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
   const router = useRouter();
 
   // Auto-refresh polling every 30s
@@ -540,7 +466,7 @@ export default function ClientApp({
           )}
 
           {/* Notifications Bell */}
-          <div className="relative" ref={notificationsRef}>
+          <div className="relative">
             <button 
               onClick={() => setShowNotificationsFlyout(!showNotificationsFlyout)}
               className="relative p-2 rounded-lg hover:bg-gray-800/80 transition-colors"
@@ -569,7 +495,7 @@ export default function ClientApp({
                   {notifications.length === 0 ? (
                     <p className="text-xs text-gray-500 py-4 text-center">Chưa có thông báo nào.</p>
                   ) : (
-                    notifications.slice((notificationPage - 1) * 15, notificationPage * 15).map(n => {
+                    notifications.slice(0, 15).map(n => {
                       const isUnread = !n.read;
                       return (
                         <div key={n.id} 
@@ -589,28 +515,15 @@ export default function ClientApp({
                     })
                   )}
                 </div>
-                {notifications.length > 15 && (
-                  <div className="flex items-center justify-between pt-2 mt-2 border-t border-gray-800 text-xs text-gray-400">
-                    <button 
-                      onClick={() => setNotificationPage(p => Math.max(1, p - 1))}
-                      disabled={notificationPage === 1}
-                      className="disabled:opacity-30 hover:text-white"
-                    >Trang trước</button>
-                    <span>Trang {notificationPage} / {Math.ceil(notifications.length / 15)}</span>
-                    <button 
-                      onClick={() => setNotificationPage(p => Math.min(Math.ceil(notifications.length / 15), p + 1))}
-                      disabled={notificationPage === Math.ceil(notifications.length / 15)}
-                      className="disabled:opacity-30 hover:text-white"
-                    >Trang sau</button>
-                  </div>
-                )}
               </div>
             )}
           </div>
 
           {/* User Pill */}
           <div className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full" style={{ background: C.panelRaised, border: `1px solid ${C.borderSoft}` }}>
-            <UserAvatar name={actor.name} />
+            <div style={{ width: 22, height: 22, borderRadius: 11, background: C.tealDim, color: C.teal, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: "bold" }}>
+              {actor.name[0]}
+            </div>
             <span style={{ fontSize: 12.5, color: C.text, fontWeight: 500 }}>{actor.name}</span>
             <RoleChip role={actor.role} />
           </div>
@@ -752,8 +665,6 @@ export default function ClientApp({
             setFilterOverdueOnly={setFilterOverdueOnly}
             boardSubTab={boardSubTab}
             setBoardSubTab={setBoardSubTab}
-            sortMode={sortMode}
-            setSortMode={setSortMode}
             runAction={runAction}
           />
         )}
@@ -836,7 +747,7 @@ export default function ClientApp({
             actor={actor}
             onShowProfile={setShowProfile}
             onAddMember={() => setShowNewMember(true)}
-            onRemoveMember={(m) => { if (window.confirm("Bạn có chắc muốn xoá thành viên " + m.name + "?")) runAction(removeMemberAction, m.id); }}
+            onRemoveMember={(m) => runAction(removeMemberAction, m.id)}
             onToggleActive={(m, val) => runAction(toggleMemberActiveAction, m.id, val)}
             runAction={runAction}
           />
@@ -923,13 +834,6 @@ export default function ClientApp({
             const days = parseInt((form.elements.namedItem("days") as HTMLInputElement).value, 10);
             const producer = (form.elements.namedItem("producer") as HTMLSelectElement).value;
             const pcId = (form.elements.namedItem("platformChannel") as HTMLSelectElement).value;
-
-            // E2. Cảnh báo sai quy trình (Duyệt ý tưởng vào ngày khác Thứ 3)
-            const today = new Date().getDay();
-            if (today !== 2) {
-              const confirm = window.confirm("Hôm nay không phải thứ 3. Bạn có chắc chắn muốn duyệt ngoại lệ không?");
-              if (!confirm) return;
-            }
 
             runAction(approveIdeaAction, approveIdeaTarget.id, days, producer, pcId);
             setApproveIdeaTarget(null);
@@ -1731,8 +1635,6 @@ function BoardView({
   setFilterOverdueOnly,
   boardSubTab,
   setBoardSubTab,
-  sortMode,
-  setSortMode,
   runAction
 }: any) {
   // Filter ideas
@@ -1879,65 +1781,54 @@ function BoardView({
                   </span>
                 </div>
 
-                <div className="space-y-2.5 overflow-y-auto max-h-[calc(100vh-320px)] pr-1 min-h-[120px]">
-                  {colIdeas.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center py-6 px-2 text-center border border-dashed border-gray-700/50 rounded-lg bg-gray-900/30">
-                      <p className="text-[11px] text-gray-500 mb-2 font-mono italic">Chưa có thẻ nào</p>
-                      {status === "PITCH" && (
-                        <button onClick={onNewIdea} className="text-[11px] font-semibold text-teal-400 hover:text-teal-300 hover:underline flex items-center gap-1">
-                          <Plus size={11} /> Nộp ý tưởng
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    colIdeas.map((idea: Idea) => {
-                      const od = overdueInfo(idea);
-                      const pc = pcById[idea.platformChannelId];
-                      const ch = pc ? channelGroupById[pc.channelGroupId] : null;
-                      const pl = pc ? platformById[pc.platformId] : null;
-                      const assignee = memberById[idea.assignedToEmail];
+                <div className="space-y-2.5 overflow-y-auto max-h-[calc(100vh-320px)] pr-1">
+                  {colIdeas.map((idea: Idea) => {
+                    const od = overdueInfo(idea);
+                    const pc = pcById[idea.platformChannelId];
+                    const ch = pc ? channelGroupById[pc.channelGroupId] : null;
+                    const pl = pc ? platformById[pc.platformId] : null;
+                    const assignee = memberById[idea.assignedToEmail];
 
-                      return (
-                        <div key={idea.id}
-                          onClick={() => onOpen(idea)}
-                          className={`p-3.5 rounded-md cursor-pointer transition-all hover:scale-[1.01] hover:shadow-lg ${od?.level === 'red' ? 'border border-red-500 bg-red-950/20' : 'border border-gray-800 bg-[#1F232D] hover:border-gray-700'}`}
-                          style={{ borderLeftWidth: 3.5, borderLeftColor: od?.level === 'red' ? C.red : (ch?.color || C.border) }}>
-                          
-                          <div className="flex items-center justify-between gap-1 mb-1.5">
-                            <span className="text-[11px] font-mono text-gray-400 truncate">{ch?.name || "Kênh"}</span>
-                            {pl && <Badge tone="muted" className="text-[10px]">{pl.name}</Badge>}
-                          </div>
-
-                          <h4 className="text-sm font-semibold text-gray-100 line-clamp-2 mb-1.5 leading-snug">
-                            {idea.title}
-                          </h4>
-
-                          {idea.description && (
-                            <p className="text-xs text-gray-400 line-clamp-2 mb-2 font-normal leading-relaxed">
-                              {idea.description}
-                            </p>
-                          )}
-
-                          {od && (
-                            <div className={`mb-2 text-[11px] font-mono flex items-center gap-1 ${od.level === 'red' ? 'text-red-400 font-bold' : 'text-amber-400'}`}>
-                              <AlertTriangle size={12} /> {od.msg}
-                            </div>
-                          )}
-
-                          <div className="flex items-center justify-between text-[11px] text-gray-500 pt-2 border-t border-gray-800/60 mt-2">
-                            <span className="truncate">
-                              {assignee ? (
-                                <span className="text-gray-300 font-medium">👤 {assignee.name}</span>
-                              ) : (
-                                <span className="text-gray-500">Chưa gán</span>
-                              )}
-                            </span>
-                            {idea.endDate && <span className="font-mono text-gray-400">{fmtDate(idea.endDate)}</span>}
-                          </div>
+                    return (
+                      <div key={idea.id}
+                        onClick={() => onOpen(idea)}
+                        className={`p-3.5 rounded-md cursor-pointer transition-all hover:scale-[1.01] hover:shadow-lg ${od?.level === 'red' ? 'border border-red-500 bg-red-950/20' : 'border border-gray-800 bg-[#1F232D] hover:border-gray-700'}`}
+                        style={{ borderLeftWidth: 3.5, borderLeftColor: od?.level === 'red' ? C.red : (ch?.color || C.border) }}>
+                        
+                        <div className="flex items-center justify-between gap-1 mb-1.5">
+                          <span className="text-[11px] font-mono text-gray-400 truncate">{ch?.name || "Kênh"}</span>
+                          {pl && <Badge tone="muted" className="text-[10px]">{pl.name}</Badge>}
                         </div>
-                      );
-                    })
-                  )}
+
+                        <h4 className="text-sm font-semibold text-gray-100 line-clamp-2 mb-1.5 leading-snug">
+                          {idea.title}
+                        </h4>
+
+                        {idea.description && (
+                          <p className="text-xs text-gray-400 line-clamp-2 mb-2 font-normal leading-relaxed">
+                            {idea.description}
+                          </p>
+                        )}
+
+                        {od && (
+                          <div className={`mb-2 text-[11px] font-mono flex items-center gap-1 ${od.level === 'red' ? 'text-red-400 font-bold' : 'text-amber-400'}`}>
+                            <AlertTriangle size={12} /> {od.msg}
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between text-[11px] text-gray-500 pt-2 border-t border-gray-800/60 mt-2">
+                          <span className="truncate">
+                            {assignee ? (
+                              <span className="text-gray-300 font-medium">👤 {assignee.name}</span>
+                            ) : (
+                              <span className="text-gray-500">Chưa gán</span>
+                            )}
+                          </span>
+                          {idea.endDate && <span className="font-mono text-gray-400">{fmtDate(idea.endDate)}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -2136,11 +2027,7 @@ function ChannelGanttView({
                             style={{ 
                               left: `${((startDay - 1) / daysInMonth) * 100}%`,
                               width: `${Math.max(1, ((endDay - startDay + 1) / daysInMonth) * 100)}%`,
-                              background: idea.status === "ASSIGNMENT" ? C.amber : 
-                                          idea.status === "SCRIPT" ? C.blue : 
-                                          idea.status === "PRODUCTION" ? C.violet : 
-                                          idea.status === "QA" ? C.red : 
-                                          idea.status === "COMPLETE" ? C.green : C.teal
+                              background: selectedChannel?.color || C.teal
                             }}>
                             {idea.title}
                           </div>
@@ -2287,11 +2174,7 @@ function MasterTimelineView({
                         style={{ 
                           left: `${((startDay - 1) / daysInMonth) * 100}%`,
                           width: `${Math.max(1, ((endDay - startDay + 1) / daysInMonth) * 100)}%`,
-                          background: idea.status === "ASSIGNMENT" ? C.amber : 
-                                      idea.status === "SCRIPT" ? C.blue : 
-                                      idea.status === "PRODUCTION" ? C.violet : 
-                                      idea.status === "QA" ? C.red : 
-                                      idea.status === "COMPLETE" ? C.green : C.teal
+                          background: ch?.color || C.teal
                         }}>
                         {idea.title}
                       </div>
@@ -2366,10 +2249,6 @@ function ContentCalendarView({
           <div key={dayName} className="text-center font-mono text-xs font-bold text-gray-500 py-1 border-b border-gray-800">
             {dayName}
           </div>
-        ))}
-
-        {Array.from({ length: new Date(year, month, 1).getDay() === 0 ? 6 : new Date(year, month, 1).getDay() - 1 }).map((_, i) => (
-          <div key={`empty-${i}`} className="min-h-[110px] p-2 rounded-md bg-transparent"></div>
         ))}
 
         {Array.from({ length: daysInMonth }).map((_, i) => {
@@ -2464,27 +2343,6 @@ function WeeklyReportView({
     }
   });
 
-  const exportMarkdown = () => {
-    const lines = [
-      "# BÁO CÁO TUẦN (YNDA Workflow)",
-      `Ngày tạo: ${new Date().toLocaleDateString('vi-VN')}`,
-      "",
-      "## 1. TỔNG QUAN",
-      `- Hoàn thành: ${completedInWeek.length} video`,
-      `- Đang trễ hạn: ${overdueList.length} video`,
-      `- Bị QA trả lại: ${qaReturned.length} video`,
-      "",
-      "## 2. NĂNG SUẤT THEO NHÂN SỰ",
-      ...Object.entries(memberCounts).sort((a,b)=>b[1]-a[1]).map(([email, count]) => {
-         const m = members.find((x: Member) => x.id === email);
-         return `- **${m?.name || email}**: ${count} video`;
-      }),
-      ""
-    ];
-    navigator.clipboard.writeText(lines.join("\\n"));
-    showToast("Đã sao chép báo cáo Markdown vào clipboard!");
-  };
-
   return (
     <div className="space-y-6 max-w-4xl">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -2493,24 +2351,14 @@ function WeeklyReportView({
           <p className="text-xs text-gray-400 mt-0.5">Tổng hợp chỉ số năng suất và chất lượng sản xuất tuần qua.</p>
         </div>
 
-        <div className="flex gap-2">
-          <Btn tone="default" onClick={exportMarkdown}>
-            <Copy size={14} /> Xuất Markdown
+        {actor.role === "Core" && (
+          <Btn tone="primary" onClick={async () => {
+            await runAction(sendWeeklyReportToDiscordAction);
+            showToast("Đã gửi báo cáo tuần vào Discord!");
+          }}>
+            <Send size={14} /> Gửi Báo Cáo Vào Discord
           </Btn>
-          {actor.role === "Core" && (
-            <Btn tone="primary" onClick={async () => {
-              // Note: action must be imported or available. If not, it will throw in runAction
-              try {
-                await runAction(sendWeeklyReportToDiscordAction);
-                showToast("Đã gửi báo cáo tuần vào Discord!");
-              } catch (e: any) {
-                console.log(e);
-              }
-            }}>
-              <Send size={14} /> Gửi Báo Cáo Discord
-            </Btn>
-          )}
-        </div>
+        )}
       </div>
 
       {/* METRIC CARDS */}
@@ -2912,41 +2760,6 @@ function IdeaDetailModal({
             </a>
           </div>
         )}
-
-        {/* TIMELINE MILESTONES */}
-        <div className="p-3 rounded bg-gray-900/60 border border-gray-800 mb-3 space-y-1">
-          <div className="text-[10px] font-mono font-bold text-gray-500 uppercase mb-2">Timeline (Tiến độ)</div>
-          <div className="relative pl-3 border-l border-gray-700 space-y-2 ml-1">
-            <div className="relative">
-              <div className="absolute w-1.5 h-1.5 bg-gray-500 rounded-full -left-[16px] top-1.5"></div>
-              <p className="text-[11px] text-gray-400">Nộp ý tưởng: <span className="text-gray-200">{fmtDateTime(idea.createdAt)}</span></p>
-            </div>
-            {idea.assignedAt && (
-              <div className="relative">
-                <div className="absolute w-1.5 h-1.5 bg-blue-500 rounded-full -left-[16px] top-1.5"></div>
-                <p className="text-[11px] text-gray-400">Giao việc: <span className="text-gray-200">{fmtDateTime(idea.assignedAt)}</span></p>
-              </div>
-            )}
-            {idea.videoSubmittedAt && (
-              <div className="relative">
-                <div className="absolute w-1.5 h-1.5 bg-amber-500 rounded-full -left-[16px] top-1.5"></div>
-                <p className="text-[11px] text-gray-400">Nộp video (QA): <span className="text-gray-200">{fmtDateTime(idea.videoSubmittedAt)}</span></p>
-              </div>
-            )}
-            {idea.status === "COMPLETE" && (
-              <div className="relative">
-                <div className="absolute w-1.5 h-1.5 bg-emerald-500 rounded-full -left-[16px] top-1.5"></div>
-                <p className="text-[11px] text-gray-400">Hoàn thành QA</p>
-              </div>
-            )}
-            {idea.cancelledAt && (
-              <div className="relative">
-                <div className="absolute w-1.5 h-1.5 bg-red-500 rounded-full -left-[16px] top-1.5"></div>
-                <p className="text-[11px] text-gray-400">Huỷ bỏ: <span className="text-gray-200">{fmtDateTime(idea.cancelledAt)}</span></p>
-              </div>
-            )}
-          </div>
-        </div>
 
         {/* CREDITS ATTRIBUTION */}
         <div className="p-3 rounded bg-gray-900/60 border border-gray-800 space-y-1">
