@@ -1,6 +1,6 @@
 "use server";
 
-import { getSpreadsheet } from "../lib/sheets";
+import { getDb } from "../lib/db";
 import { getCurrentMember } from "./auth-actions";
 import { createNotification, sendDiscordWebhook } from "./notification-actions";
 import { recordAuditLog } from "./audit-actions";
@@ -15,31 +15,27 @@ export async function addCommentAction(ideaId: string, content: string) {
     throw new Error("Nội dung bình luận không được để trống");
   }
 
-  const doc = await getSpreadsheet();
-  const commentsSheet = doc.sheetsByTitle["Comments"];
-  const ideasSheet = doc.sheetsByTitle["Ideas"];
-  if (!commentsSheet || !ideasSheet) throw new Error("Thiếu bảng dữ liệu Comments hoặc Ideas");
-
-  const ideaRows = await ideasSheet.getRows();
-  const ideaRow = ideaRows.find(r => r.get('id') === ideaId);
+  const sql = getDb();
+  const ideaRows = await sql.query(`SELECT * FROM ideas WHERE id = $1 LIMIT 1`, [ideaId]);
+  const ideaRow = ideaRows[0] as any;
   if (!ideaRow) throw new Error("Không tìm thấy ý tưởng");
 
   const commentId = crypto.randomUUID();
-  await commentsSheet.addRow({
-    id: commentId,
-    ideaId,
-    memberId: member.id,
-    content: content.trim(),
-    createdAt: new Date().toISOString()
-  });
+  const now = new Date().toISOString();
+
+  await sql.query(
+    `INSERT INTO comments (id, idea_id, member_id, content, created_at)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [commentId, ideaId, member.id, content.trim(), now]
+  );
 
   // Record audit log
   await recordAuditLog(ideaId, member.id, "Thêm bình luận", { commentPreview: content.trim().slice(0, 80) });
 
   // Notify relevant users (assignedTo, submittedBy)
-  const assignedTo = ideaRow.get('assignedToEmail');
-  const submittedBy = ideaRow.get('submittedByEmail');
-  const ideaTitle = ideaRow.get('title') || 'Ý tưởng';
+  const assignedTo = ideaRow.assigned_to_email;
+  const submittedBy = ideaRow.submitted_by_email;
+  const ideaTitle = ideaRow.title || 'Ý tưởng';
 
   const notifyTargets = new Set<string>();
   if (assignedTo && assignedTo !== member.id) notifyTargets.add(assignedTo);
@@ -60,3 +56,4 @@ export async function addCommentAction(ideaId: string, content: string) {
   revalidatePath("/");
   return { success: true, id: commentId };
 }
+

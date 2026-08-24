@@ -1,6 +1,6 @@
 "use server";
 
-import { getSpreadsheet } from "../lib/sheets";
+import { getDb } from "../lib/db";
 import crypto from "crypto";
 
 export async function recordAuditLog(
@@ -10,19 +10,21 @@ export async function recordAuditLog(
   metadata: any = {}
 ) {
   try {
-    const doc = await getSpreadsheet();
-    const sheet = doc.sheetsByTitle["AuditLogs"];
-    if (!sheet) return;
-
-    await sheet.addRow({
-      id: crypto.randomUUID(),
-      ideaId: ideaId || '',
-      memberId: memberId || '',
-      action: action || '',
-      metadata: typeof metadata === 'string' ? metadata : JSON.stringify(metadata),
-      timestamp: new Date().toISOString()
-    });
+    const sql = getDb();
+    await sql.query(
+      `INSERT INTO audit_logs (id, idea_id, member_id, action, metadata, timestamp)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        crypto.randomUUID(),
+        ideaId || '',
+        memberId || '',
+        action || '',
+        typeof metadata === 'string' ? metadata : JSON.stringify(metadata),
+        new Date().toISOString()
+      ]
+    );
   } catch (err) {
     console.error("Lỗi ghi AuditLog:", err);
   }
 }
+

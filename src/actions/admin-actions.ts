@@ -1,10 +1,9 @@
 "use server";
 
-import { getSpreadsheet } from "../lib/sheets";
+import { getDb } from "../lib/db";
 import { getCurrentMember } from "./auth-actions";
 import { recordAuditLog } from "./audit-actions";
 import { revalidatePath } from "next/cache";
-import crypto from "crypto";
 
 // -------------------------------------------------------------
 // PLATFORMS
@@ -17,18 +16,13 @@ export async function createPlatformAction(name: string, defaultDurationDays: nu
   if (!name || !name.trim()) throw new Error("Tên nền tảng không được để trống");
   if (!defaultDurationDays || defaultDurationDays < 1) throw new Error("Số ngày mặc định phải từ 1 ngày trở lên");
 
-  const doc = await getSpreadsheet();
-  let sheet = doc.sheetsByTitle["Platforms"];
-  if (!sheet) {
-    sheet = await doc.addSheet({ title: "Platforms", headerValues: ["id", "name", "defaultDurationDays"] });
-  }
-
+  const sql = getDb();
   const id = `plat_${Date.now().toString(36)}`;
-  await sheet.addRow({
-    id,
-    name: name.trim(),
-    defaultDurationDays: defaultDurationDays.toString()
-  });
+  await sql.query(
+    `INSERT INTO platforms (id, name, default_duration_days)
+     VALUES ($1, $2, $3)`,
+    [id, name.trim(), defaultDurationDays]
+  );
 
   await recordAuditLog('', member.id, "Tạo Nền tảng mới", { name, defaultDurationDays });
   revalidatePath("/");
@@ -44,21 +38,14 @@ export async function createChannelGroupAction(name: string, color: string, sele
 
   if (!name || !name.trim()) throw new Error("Tên kênh không được để trống");
 
-  const doc = await getSpreadsheet();
-  const cgSheet = doc.sheetsByTitle["ChannelGroups"] || doc.sheetsByTitle["Channels"];
-  let pcSheet = doc.sheetsByTitle["PlatformChannels"];
-  if (!cgSheet) throw new Error("Thiếu tab ChannelGroups");
-  if (!pcSheet) {
-    pcSheet = await doc.addSheet({ title: "PlatformChannels", headerValues: ["id", "channelGroupId", "platformId"] });
-  }
-
+  const sql = getDb();
   const channelGroupId = `cg_${Date.now().toString(36)}`;
-  await cgSheet.addRow({
-    id: channelGroupId,
-    name: name.trim(),
-    color: color || "#5B9EE8",
-    archived: "FALSE"
-  });
+
+  await sql.query(
+    `INSERT INTO channel_groups (id, name, color, archived)
+     VALUES ($1, $2, $3, $4)`,
+    [channelGroupId, name.trim(), color || "#5B9EE8", false]
+  );
 
   // Automatically create PlatformChannels for selected platforms
   const platformsToAssign = (selectedPlatformIds && selectedPlatformIds.length > 0) 
@@ -66,11 +53,12 @@ export async function createChannelGroupAction(name: string, color: string, sele
     : ["plat_yt", "plat_tt"];
 
   for (const platId of platformsToAssign) {
-    await pcSheet.addRow({
-      id: `pc_${channelGroupId}_${platId}`,
-      channelGroupId,
-      platformId: platId
-    });
+    await sql.query(
+      `INSERT INTO platform_channels (id, channel_group_id, platform_id)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (id) DO NOTHING`,
+      [`pc_${channelGroupId}_${platId}`, channelGroupId, platId]
+    );
   }
 
   await recordAuditLog('', member.id, "Tạo Kênh mới", { name, color, platforms: platformsToAssign });
@@ -82,40 +70,29 @@ export async function archiveChannelGroupAction(channelGroupId: string) {
   if (!member) throw new Error("Chưa đăng nhập");
   if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền xoá kênh");
 
-  const doc = await getSpreadsheet();
-  const cgSheet = doc.sheetsByTitle["ChannelGroups"] || doc.sheetsByTitle["Channels"];
-  const pcSheet = doc.sheetsByTitle["PlatformChannels"];
-  const ideasSheet = doc.sheetsByTitle["Ideas"];
-  if (!cgSheet || !ideasSheet) throw new Error("Thiếu bảng dữ liệu ChannelGroups hoặc Ideas");
+  const sql = getDb();
+  
+  // Check if there are ideas linked to this channel group
+  const pcRows = await sql.query(
+    `SELECT id FROM platform_channels WHERE channel_group_id = $1`,
+    [channelGroupId]
+  );
+  const pcIds = pcRows.map((r: any) => r.id);
 
-  // Get all platformChannelIds belonging to this channelGroup
-  let associatedPcIds: string[] = [];
-  if (pcSheet) {
-    const pcRows = await pcSheet.getRows();
-    associatedPcIds = pcRows.filter(r => r.get('channelGroupId') === channelGroupId).map(r => r.get('id'));
+  let ideaCount = 0;
+  if (pcIds.length > 0) {
+    const countRes = await sql.query(
+      `SELECT COUNT(*) as count FROM ideas WHERE platform_channel_id = ANY($1)`,
+      [pcIds]
+    );
+    ideaCount = parseInt(countRes[0]?.count || '0', 10);
   }
 
-  const ideaRows = await ideasSheet.getRows();
-  const ideaCount = ideaRows.filter(r => 
-    r.get('channelId') === channelGroupId || associatedPcIds.includes(r.get('platformChannelId'))
-  ).length;
-
-  const cgRows = await cgSheet.getRows();
-  const row = cgRows.find(r => r.get('id') === channelGroupId);
-  if (!row) throw new Error("Không tìm thấy kênh");
-
   if (ideaCount === 0) {
-    await row.delete();
-    // Also delete platformChannels
-    if (pcSheet) {
-      const pcRows = await pcSheet.getRows();
-      for (const pcRow of pcRows) {
-        if (pcRow.get('channelGroupId') === channelGroupId) await pcRow.delete();
-      }
-    }
+    await sql.query(`DELETE FROM platform_channels WHERE channel_group_id = $1`, [channelGroupId]);
+    await sql.query(`DELETE FROM channel_groups WHERE id = $1`, [channelGroupId]);
   } else {
-    row.set('archived', "TRUE");
-    await row.save();
+    await sql.query(`UPDATE channel_groups SET archived = TRUE WHERE id = $1`, [channelGroupId]);
   }
 
   await recordAuditLog('', member.id, "Lưu trữ / Xoá kênh", { channelGroupId, ideaCount });
@@ -127,16 +104,8 @@ export async function restoreChannelGroupAction(channelGroupId: string) {
   if (!member) throw new Error("Chưa đăng nhập");
   if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền khôi phục kênh");
 
-  const doc = await getSpreadsheet();
-  const sheet = doc.sheetsByTitle["ChannelGroups"] || doc.sheetsByTitle["Channels"];
-  if (!sheet) throw new Error("Thiếu tab ChannelGroups");
-
-  const rows = await sheet.getRows();
-  const row = rows.find(r => r.get('id') === channelGroupId);
-  if (!row) throw new Error("Không tìm thấy kênh");
-
-  row.set('archived', "FALSE");
-  await row.save();
+  const sql = getDb();
+  await sql.query(`UPDATE channel_groups SET archived = FALSE WHERE id = $1`, [channelGroupId]);
 
   await recordAuditLog('', member.id, "Khôi phục kênh", { channelGroupId });
   revalidatePath("/");
@@ -155,36 +124,38 @@ export async function createMemberAction(
   primaryExpertise?: string, 
   secondaryExpertise?: string
 ) {
-  const doc = await getSpreadsheet();
-  const sheet = doc.sheetsByTitle["Members"];
-  if (!sheet) throw new Error("Thiếu tab Members");
+  const cleanEmail = email.toLowerCase().trim();
+  const sql = getDb();
 
-  const rows = await sheet.getRows();
-  const totalMembers = rows.length;
-  
+  const totalMembersRes = await sql.query(`SELECT COUNT(*) as count FROM members`);
+  const totalMembers = parseInt(totalMembersRes[0]?.count || '0', 10);
+
   const member = await getCurrentMember();
   if (totalMembers > 0) {
     if (!member) throw new Error("Chưa đăng nhập");
     if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền tạo thành viên");
   }
 
-  const cleanEmail = email.toLowerCase().trim();
-  const existing = rows.find(r => (r.get('id') || '').toLowerCase().trim() === cleanEmail);
-  if (existing) {
+  const existingRes = await sql.query(`SELECT id FROM members WHERE id = $1`, [cleanEmail]);
+  if (existingRes.length > 0) {
     throw new Error(`Email ${cleanEmail} đã tồn tại trong danh sách thành viên`);
   }
 
-  await sheet.addRow({
-    id: cleanEmail,
-    name: name.trim(),
-    role: role || "P",
-    password: password ? password.trim() : (phone ? phone.trim() : "123"),
-    phone: phone || "",
-    facebook: facebook || "",
-    primaryExpertise: primaryExpertise || "",
-    secondaryExpertise: secondaryExpertise || "",
-    active: "TRUE"
-  });
+  await sql.query(
+    `INSERT INTO members (id, name, role, password, phone, facebook, primary_expertise, secondary_expertise, active)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [
+      cleanEmail,
+      name.trim(),
+      role || "P",
+      password ? password.trim() : (phone ? phone.trim() : "123"),
+      phone || "",
+      facebook || "",
+      primaryExpertise || "",
+      secondaryExpertise || "",
+      true
+    ]
+  );
 
   await recordAuditLog('', member?.id || cleanEmail, "Thêm thành viên mới", { name, email: cleanEmail, role });
   revalidatePath("/");
@@ -201,12 +172,9 @@ export async function bulkImportMembersAction(
   if (!rows || rows.length === 0) throw new Error("Không có dữ liệu để import");
   if (rows.length > 50) throw new Error("Tối đa 50 thành viên mỗi lần import");
 
-  const doc = await getSpreadsheet();
-  const sheet = doc.sheetsByTitle["Members"];
-  if (!sheet) throw new Error("Thiếu tab Members");
-
-  const existingRows = await sheet.getRows();
-  const existingEmails = new Set(existingRows.map(r => (r.get('id') || '').toLowerCase().trim()));
+  const sql = getDb();
+  const existingRows = await sql.query(`SELECT id FROM members`);
+  const existingEmails = new Set(existingRows.map((r: any) => (r.id || '').toLowerCase().trim()));
 
   let imported = 0;
   let skipped = 0;
@@ -229,18 +197,23 @@ export async function bulkImportMembersAction(
 
     const validRoles = ["Core", "E", "Editor", "P", "Producer"];
     const role = validRoles.includes(row.role) ? row.role : "P";
+    const mappedRole = role === "Editor" ? "E" : (role === "Producer" ? "P" : role);
 
-    await sheet.addRow({
-      id: cleanEmail,
-      name: cleanName,
-      role: role === "Editor" ? "E" : (role === "Producer" ? "P" : role),
-      password: (row.password || '').trim() || "123",
-      phone: row.phone || "",
-      facebook: row.facebook || "",
-      primaryExpertise: row.primaryExpertise || "",
-      secondaryExpertise: row.secondaryExpertise || "",
-      active: "TRUE"
-    });
+    await sql.query(
+      `INSERT INTO members (id, name, role, password, phone, facebook, primary_expertise, secondary_expertise, active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        cleanEmail,
+        cleanName,
+        mappedRole,
+        (row.password || '').trim() || "123",
+        row.phone || "",
+        row.facebook || "",
+        row.primaryExpertise || "",
+        row.secondaryExpertise || "",
+        true
+      ]
+    );
     
     existingEmails.add(cleanEmail);
     imported++;
@@ -268,23 +241,30 @@ export async function updateMemberProfileAction(
     throw new Error("Bạn không có quyền sửa thông tin của thành viên khác");
   }
 
-  const doc = await getSpreadsheet();
-  const sheet = doc.sheetsByTitle["Members"];
-  if (!sheet) throw new Error("Thiếu tab Members");
-
-  const rows = await sheet.getRows();
-  const row = rows.find(r => r.get('id') === memberId);
+  const sql = getDb();
+  const existingRows = await sql.query(`SELECT * FROM members WHERE id = $1 LIMIT 1`, [memberId]);
+  const row = existingRows[0] as any;
   if (!row) throw new Error("Không tìm thấy thành viên");
 
-  if (name) row.set('name', name);
-  if (phone !== undefined) row.set('phone', phone);
-  if (facebook !== undefined) row.set('facebook', facebook);
-  if (primaryExpertise !== undefined) row.set('primaryExpertise', primaryExpertise);
-  if (secondaryExpertise !== undefined) row.set('secondaryExpertise', secondaryExpertise);
-  if (role && current.role === "Core") row.set('role', role);
-  if (password && password.trim() !== "") row.set('password', password.trim());
+  const updatedName = name || row.name;
+  const updatedPhone = phone !== undefined ? phone : row.phone;
+  const updatedFb = facebook !== undefined ? facebook : row.facebook;
+  const updatedPrimary = primaryExpertise !== undefined ? primaryExpertise : row.primary_expertise;
+  const updatedSecondary = secondaryExpertise !== undefined ? secondaryExpertise : row.secondary_expertise;
+  const updatedRole = (role && current.role === "Core") ? role : row.role;
+  const updatedPassword = (password && password.trim() !== "") ? password.trim() : row.password;
 
-  await row.save();
+  await sql.query(
+    `UPDATE members SET 
+       name = $1, phone = $2, facebook = $3, primary_expertise = $4,
+       secondary_expertise = $5, role = $6, password = $7
+     WHERE id = $8`,
+    [
+      updatedName, updatedPhone, updatedFb, updatedPrimary,
+      updatedSecondary, updatedRole, updatedPassword, memberId
+    ]
+  );
+
   await recordAuditLog('', current.id, "Cập nhật hồ sơ thành viên", { targetMember: memberId, name });
   revalidatePath("/");
 }
@@ -294,16 +274,8 @@ export async function toggleMemberActiveAction(email: string, active: boolean) {
   if (!current) throw new Error("Chưa đăng nhập");
   if (current.role !== "Core") throw new Error("Chỉ Core mới có quyền thay đổi trạng thái hoạt động của thành viên");
 
-  const doc = await getSpreadsheet();
-  const sheet = doc.sheetsByTitle["Members"];
-  if (!sheet) throw new Error("Thiếu tab Members");
-
-  const rows = await sheet.getRows();
-  const row = rows.find(r => r.get('id') === email);
-  if (!row) throw new Error("Không tìm thấy thành viên");
-
-  row.set('active', active ? "TRUE" : "FALSE");
-  await row.save();
+  const sql = getDb();
+  await sql.query(`UPDATE members SET active = $1 WHERE id = $2`, [active, email]);
 
   await recordAuditLog('', current.id, active ? "Kích hoạt lại thành viên" : "Vô hiệu hoá thành viên", { targetMember: email });
   revalidatePath("/");
@@ -314,28 +286,20 @@ export async function removeMemberAction(memberEmailToRemove: string) {
   if (!member) throw new Error("Chưa đăng nhập");
   if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền xoá thành viên");
 
-  const doc = await getSpreadsheet();
-  const ideasSheet = doc.sheetsByTitle["Ideas"];
-  const membersSheet = doc.sheetsByTitle["Members"];
+  const sql = getDb();
   
-  if (ideasSheet) {
-    const ideaRows = await ideasSheet.getRows();
-    const activeAssignedIdeas = ideaRows.filter(r => 
-      r.get('assignedToEmail') === memberEmailToRemove && 
-      r.get('status') !== "COMPLETE" &&
-      r.get('status') !== "CANCELLED"
-    ).length;
+  const activeAssignedRes = await sql.query(
+    `SELECT COUNT(*) as count FROM ideas 
+     WHERE assigned_to_email = $1 AND status NOT IN ('COMPLETE', 'CANCELLED')`,
+    [memberEmailToRemove]
+  );
+  const activeAssignedIdeas = parseInt(activeAssignedRes[0]?.count || '0', 10);
 
-    if (activeAssignedIdeas > 0) {
-      throw new Error(`Không thể xoá — thành viên đang phụ trách ${activeAssignedIdeas} idea chưa hoàn thành. Hãy gán lại người khác trước hoặc chuyển sang 'Ngừng hoạt động'.`);
-    }
+  if (activeAssignedIdeas > 0) {
+    throw new Error(`Không thể xoá — thành viên đang phụ trách ${activeAssignedIdeas} idea chưa hoàn thành. Hãy gán lại người khác trước hoặc chuyển sang 'Ngừng hoạt động'.`);
   }
 
-  const memberRows = await membersSheet.getRows();
-  const row = memberRows.find(r => r.get('id') === memberEmailToRemove);
-  if (row) {
-    await row.delete();
-  }
+  await sql.query(`DELETE FROM members WHERE id = $1`, [memberEmailToRemove]);
 
   await recordAuditLog('', member.id, "Xoá thành viên", { removedMember: memberEmailToRemove });
   revalidatePath("/");
@@ -349,27 +313,26 @@ export async function updateSettingsAction(discordWebhookUrl: string, externalCa
   if (!current) throw new Error("Chưa đăng nhập");
   if (current.role !== "Core") throw new Error("Chỉ Core mới có quyền chỉnh sửa cấu hình hệ thống");
 
-  const doc = await getSpreadsheet();
-  let sheet = doc.sheetsByTitle["Settings"];
-  if (!sheet) {
-    sheet = await doc.addSheet({ title: "Settings", headerValues: ["key", "value"] });
+  const sql = getDb();
+
+  if (discordWebhookUrl !== undefined) {
+    await sql.query(
+      `INSERT INTO settings (key, value) VALUES ('discordWebhookUrl', $1)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [discordWebhookUrl.trim()]
+    );
   }
 
-  const rows = await sheet.getRows();
-  const setKey = async (key: string, val: string) => {
-    let row = rows.find(r => r.get('key') === key);
-    if (row) {
-      row.set('value', val);
-      await row.save();
-    } else {
-      await sheet.addRow({ key, value: val });
-    }
-  };
-
-  if (discordWebhookUrl !== undefined) await setKey('discordWebhookUrl', discordWebhookUrl.trim());
-  if (externalCalendarUrl !== undefined) await setKey('externalCalendarUrl', externalCalendarUrl.trim());
+  if (externalCalendarUrl !== undefined) {
+    await sql.query(
+      `INSERT INTO settings (key, value) VALUES ('externalCalendarUrl', $1)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [externalCalendarUrl.trim()]
+    );
+  }
 
   await recordAuditLog('', current.id, "Cập nhật cấu hình hệ thống (Settings)");
   revalidatePath("/");
 }
+
 

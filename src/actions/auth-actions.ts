@@ -1,7 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { getSpreadsheet } from "../lib/sheets";
+import { getDb } from "../lib/db";
 import { Member } from "../lib/types";
 
 import bcrypt from "bcryptjs";
@@ -22,30 +22,27 @@ export async function loginWithCredentialsAction(emailOrUsername: string, passwo
       return { error: `Thử quá nhiều lần. Vui lòng thử lại sau ${remainingMinutes} phút.` };
     }
 
-    const doc = await getSpreadsheet();
-    const sheet = doc.sheetsByTitle["Members"];
-    if (!sheet) return { error: "Database thiếu tab 'Members'" };
+    const sql = getDb();
+    const rows = await sql.query(
+      `SELECT * FROM members WHERE LOWER(TRIM(id)) = $1 OR (username IS NOT NULL AND LOWER(TRIM(username)) = $1) LIMIT 1`,
+      [query]
+    );
 
-    const rows = await sheet.getRows();
-    const member = rows.find(r => {
-      const id = (r.get('id') || '').toLowerCase().trim();
-      const username = (r.get('username') || '').toLowerCase().trim();
-      return id === query || (username && username === query);
-    });
+    const member = rows[0] as any;
     
     if (!member) {
       recordFailure(query, attempt);
       return { error: `Tài khoản ${emailOrUsername} không tồn tại trong hệ thống.` };
     }
 
-    const isActive = member.get('active') !== 'FALSE' && member.get('active') !== 'false';
+    const isActive = member.active !== false;
     if (!isActive) {
       recordFailure(query, attempt);
       return { error: "Tài khoản này đã bị vô hiệu hóa / ngừng hoạt động. Vui lòng liên hệ Core." };
     }
 
-    const savedPassword = member.get('password');
-    const savedPhone = member.get('phone');
+    const savedPassword = member.password;
+    const savedPhone = member.phone;
 
     const expectedPassword = (savedPassword && savedPassword.trim() !== "") 
       ? savedPassword.trim() 
@@ -74,7 +71,7 @@ export async function loginWithCredentialsAction(emailOrUsername: string, passwo
     loginAttempts.delete(query);
 
     const cookieStore = await cookies();
-    cookieStore.set("currentMemberEmail", member.get('id'), { 
+    cookieStore.set("currentMemberEmail", member.id, { 
       path: "/", 
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -105,31 +102,26 @@ export async function getCurrentMember(): Promise<Member | null> {
   if (!email) return null;
   
   try {
-    const doc = await getSpreadsheet();
-    const sheet = doc.sheetsByTitle["Members"];
-    if (!sheet) return null;
-
-    const rows = await sheet.getRows();
-    const member = rows.find(r => r.get('id') === email);
+    const sql = getDb();
+    const rows = await sql.query(`SELECT * FROM members WHERE id = $1 LIMIT 1`, [email]);
+    const member = rows[0] as any;
     
     if (!member) return null;
-
-    const isActive = member.get('active') !== 'FALSE' && member.get('active') !== 'false';
-    if (!isActive) return null;
+    if (member.active === false) return null;
 
     return {
-      id: member.get('id'),
-      name: member.get('name'),
-      role: (member.get('role') || 'P') as any,
-      username: member.get('username') || '',
-      phone: member.get('phone') || '',
-      facebook: member.get('facebook') || '',
-      primaryExpertise: member.get('primaryExpertise') || '',
-      secondaryExpertise: member.get('secondaryExpertise') || '',
+      id: member.id,
+      name: member.name,
+      role: (member.role || 'P') as any,
+      username: member.username || '',
+      phone: member.phone || '',
+      facebook: member.facebook || '',
+      primaryExpertise: member.primary_expertise || '',
+      secondaryExpertise: member.secondary_expertise || '',
       active: true
     };
   } catch (err) {
-    console.error("Lỗi xác thực session Google Sheets:", err);
+    console.error("Lỗi xác thực session Postgres:", err);
     return null;
   }
 }
@@ -142,16 +134,13 @@ export async function changePasswordAction(oldPasswordInput: string, newPassword
     throw new Error("Mật khẩu mới quá ngắn (tối thiểu 3 ký tự)");
   }
 
-  const doc = await getSpreadsheet();
-  const sheet = doc.sheetsByTitle["Members"];
-  if (!sheet) throw new Error("Database thiếu tab 'Members'");
-
-  const rows = await sheet.getRows();
-  const memberRow = rows.find(r => r.get('id') === currentMember.id);
+  const sql = getDb();
+  const rows = await sql.query(`SELECT * FROM members WHERE id = $1 LIMIT 1`, [currentMember.id]);
+  const memberRow = rows[0] as any;
   if (!memberRow) throw new Error("Không tìm thấy tài khoản trong hệ thống");
 
-  const savedPassword = memberRow.get('password');
-  const savedPhone = memberRow.get('phone');
+  const savedPassword = memberRow.password;
+  const savedPhone = memberRow.phone;
   const expectedOldPassword = (savedPassword && savedPassword.trim() !== "") 
     ? savedPassword.trim() 
     : (savedPhone ? savedPhone.trim() : "");
@@ -170,9 +159,9 @@ export async function changePasswordAction(oldPasswordInput: string, newPassword
   }
 
   const newHash = await bcrypt.hash(newPasswordInput.trim(), 10);
-  memberRow.set('password', newHash);
-  await memberRow.save();
+  await sql.query(`UPDATE members SET password = $1 WHERE id = $2`, [newHash, currentMember.id]);
 
   return true;
 }
+
 

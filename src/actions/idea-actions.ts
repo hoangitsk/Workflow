@@ -1,10 +1,10 @@
 "use server";
 
-import { getSpreadsheet } from "../lib/sheets";
+import { getDb } from "../lib/db";
 import { getCurrentMember } from "./auth-actions";
 import { recordAuditLog } from "./audit-actions";
 import { createNotification, sendDiscordWebhook } from "./notification-actions";
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import crypto from "crypto";
 
 function isValidUrl(string: string) {
@@ -17,11 +17,9 @@ function isValidUrl(string: string) {
 }
 
 async function getIdeaRow(ideaId: string) {
-  const doc = await getSpreadsheet();
-  const sheet = doc.sheetsByTitle["Ideas"];
-  if (!sheet) throw new Error("Thiếu tab Ideas");
-  const rows = await sheet.getRows();
-  return { sheet, row: rows.find(r => r.get('id') === ideaId) };
+  const sql = getDb();
+  const rows = await sql.query(`SELECT * FROM ideas WHERE id = $1 LIMIT 1`, [ideaId]);
+  return rows[0] as any;
 }
 
 export async function submitIdeaAction(title: string, description: string, platformChannelId: string) {
@@ -40,24 +38,27 @@ export async function submitIdeaAction(title: string, description: string, platf
     throw new Error("Vui lòng chọn Kênh & Nền tảng cho ý tưởng");
   }
 
-  const doc = await getSpreadsheet();
-  const sheet = doc.sheetsByTitle["Ideas"];
-  if (!sheet) throw new Error("Thiếu tab Ideas");
-
+  const sql = getDb();
   const ideaId = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  await sheet.addRow({
-    id: ideaId,
-    title: title.trim(),
-    description: description.trim(),
-    platformChannelId: platformChannelId.trim(),
-    submittedByEmail: member.id,
-    status: "PITCH",
-    createdAt: now,
-    creditsIdeaByEmail: member.id,
-    lastPitchWeek: now.slice(0, 10)
-  });
+  await sql.query(
+    `INSERT INTO ideas (
+      id, title, description, platform_channel_id, submitted_by_email,
+      status, created_at, credits_idea_by_email, last_pitch_week
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [
+      ideaId,
+      title.trim(),
+      description.trim(),
+      platformChannelId.trim(),
+      member.id,
+      "PITCH",
+      now,
+      member.id,
+      now.slice(0, 10)
+    ]
+  );
 
   // Audit log
   await recordAuditLog(ideaId, member.id, "Nộp ý tưởng mới", { title: title.trim(), description: description.trim() });
@@ -65,7 +66,6 @@ export async function submitIdeaAction(title: string, description: string, platf
   // Discord notification to #core
   await sendDiscordWebhook(`💡 **${member.name}** vừa nộp ý tưởng mới: **"${title.trim()}"**\n> ${description.trim().slice(0, 150)}`);
 
-  revalidateTag("sheets");
   revalidatePath("/");
   return { success: true, id: ideaId };
 }
@@ -83,30 +83,43 @@ export async function approveIdeaAction(ideaId: string, durationDays: number, pr
     throw new Error("Số ngày sản xuất phải từ 1 ngày trở lên");
   }
 
+  const row = await getIdeaRow(ideaId);
+  if (!row) throw new Error("Không tìm thấy ý tưởng");
+
+  if (row.status !== "PITCH" && row.status !== "ARCHIVED_IDEA") {
+    throw new Error("Chỉ có thể duyệt ý tưởng đang ở trạng thái PITCH hoặc Đã lưu trữ");
+  }
+
   const today = new Date();
   const endDate = new Date();
   endDate.setDate(today.getDate() + durationDays - 1);
 
-  const { row } = await getIdeaRow(ideaId);
-  if (!row) throw new Error("Không tìm thấy ý tưởng");
-
-  if (row.get('status') !== "PITCH" && row.get('status') !== "ARCHIVED_IDEA") {
-    throw new Error("Chỉ có thể duyệt ý tưởng đang ở trạng thái PITCH hoặc Đã lưu trữ");
-  }
-
   const todayIso = today.toISOString().slice(0, 10);
   const endIso = endDate.toISOString().slice(0, 10);
 
-  row.set('status', "ASSIGNMENT");
-  if (platformChannelId) row.set('platformChannelId', platformChannelId);
-  row.set('durationDays', durationDays.toString());
-  row.set('assignedToEmail', producerEmail.trim());
-  row.set('startDate', todayIso);
-  row.set('endDate', endIso);
-  row.set('assignedAt', today.toISOString());
-  row.set('creditsApprovedByEmail', member.id);
-
-  await row.save();
+  const sql = getDb();
+  await sql.query(
+    `UPDATE ideas SET 
+       status = 'ASSIGNMENT',
+       platform_channel_id = COALESCE($1, platform_channel_id),
+       duration_days = $2,
+       assigned_to_email = $3,
+       start_date = $4,
+       end_date = $5,
+       assigned_at = $6,
+       credits_approved_by_email = $7
+     WHERE id = $8`,
+    [
+      platformChannelId ? platformChannelId.trim() : null,
+      durationDays,
+      producerEmail.trim(),
+      todayIso,
+      endIso,
+      today.toISOString(),
+      member.id,
+      ideaId
+    ]
+  );
 
   // Audit log
   await recordAuditLog(ideaId, member.id, "Duyệt ý tưởng PITCH -> ASSIGNMENT", {
@@ -121,12 +134,11 @@ export async function approveIdeaAction(ideaId: string, durationDays: number, pr
     producerEmail,
     'assigned',
     ideaId,
-    `Bạn đã được giao sản xuất ý tưởng "${row.get('title')}" (Hạn: ${endIso})`
+    `Bạn đã được giao sản xuất ý tưởng "${row.title}" (Hạn: ${endIso})`
   );
 
-  await sendDiscordWebhook(`📋 Ý tưởng **"${row.get('title')}"** đã được Core duyệt và giao cho **${producerEmail}** (Sản xuất: ${durationDays} ngày, hạn: ${endIso})`);
+  await sendDiscordWebhook(`📋 Ý tưởng **"${row.title}"** đã được Core duyệt và giao cho **${producerEmail}** (Sản xuất: ${durationDays} ngày, hạn: ${endIso})`);
 
-  revalidateTag("sheets");
   revalidatePath("/");
 }
 
@@ -134,48 +146,45 @@ export async function submitScriptAction(ideaId: string, scriptLink?: string) {
   const member = await getCurrentMember();
   if (!member) throw new Error("Chưa đăng nhập");
 
-  const { row } = await getIdeaRow(ideaId);
+  const row = await getIdeaRow(ideaId);
   if (!row) throw new Error("Không tìm thấy ý tưởng");
   
-  if (row.get('assignedToEmail') !== member.id || member.role !== "P") {
+  if (row.assigned_to_email !== member.id || member.role !== "P") {
     throw new Error("Chỉ Producer được giao mới có quyền nộp kịch bản");
   }
 
-  if (row.get('status') !== "ASSIGNMENT") {
+  if (row.status !== "ASSIGNMENT") {
     throw new Error("Trạng thái hiện tại không hợp lệ để nộp kịch bản");
   }
 
-  row.set('status', "SCRIPT");
-  if (scriptLink) {
-    if (!isValidUrl(scriptLink.trim())) throw new Error("Link kịch bản không hợp lệ. Vui lòng nhập URL hợp lệ bắt đầu bằng http:// hoặc https://");
-    row.set('scriptLink', scriptLink.trim());
+  if (scriptLink && !isValidUrl(scriptLink.trim())) {
+    throw new Error("Link kịch bản không hợp lệ. Vui lòng nhập URL hợp lệ bắt đầu bằng http:// hoặc https://");
   }
-  row.set('creditsScriptByEmail', member.id);
-  await row.save();
+
+  const sql = getDb();
+  await sql.query(
+    `UPDATE ideas SET
+       status = 'SCRIPT',
+       script_link = COALESCE($1, script_link),
+       credits_script_by_email = $2
+     WHERE id = $3`,
+    [scriptLink ? scriptLink.trim() : null, member.id, ideaId]
+  );
 
   await recordAuditLog(ideaId, member.id, "Nộp kịch bản ASSIGNMENT -> SCRIPT", { scriptLink });
+  await sendDiscordWebhook(`📝 Producer **${member.name}** đã nộp kịch bản cho **"${row.title}"**. Chờ Editor sửa & duyệt.`);
 
-  await sendDiscordWebhook(`📝 Producer **${member.name}** đã nộp kịch bản cho **"${row.get('title')}"**. Chờ Editor sửa & duyệt.`);
-
-  // Thông báo in-app cho Editor và Core (B7)
-  const doc = await getSpreadsheet();
-  const membersSheet = doc.sheetsByTitle["Members"];
-  if (membersSheet) {
-    const allMembers = await membersSheet.getRows();
-    for (const m of allMembers) {
-      const role = m.get('role');
-      if (role === 'E' || role === 'Core') {
-        await createNotification(
-          m.get('id'),
-          'info',
-          ideaId,
-          `Kịch bản "${row.get('title')}" đã được nộp bởi ${member.name}. Cần được kiểm duyệt.`
-        );
-      }
-    }
+  // In-app notification for Editor and Core
+  const editorCoreRows = await sql.query(`SELECT id FROM members WHERE role IN ('E', 'Core')`);
+  for (const m of (editorCoreRows as any[])) {
+    await createNotification(
+      m.id,
+      'info',
+      ideaId,
+      `Kịch bản "${row.title}" đã được nộp bởi ${member.name}. Cần được kiểm duyệt.`
+    );
   }
 
-  revalidateTag("sheets");
   revalidatePath("/");
 }
 
@@ -186,32 +195,31 @@ export async function startProductionAction(ideaId: string) {
     throw new Error("Chỉ Editor hoặc Core mới được xác nhận kịch bản và bắt đầu sản xuất");
   }
 
-  const { row } = await getIdeaRow(ideaId);
+  const row = await getIdeaRow(ideaId);
   if (!row) throw new Error("Không tìm thấy ý tưởng");
 
-  if (row.get('status') !== "SCRIPT") {
+  if (row.status !== "SCRIPT") {
     throw new Error("Chỉ ý tưởng ở trạng thái SCRIPT mới được chuyển sang PRODUCTION");
   }
 
-  row.set('status', "PRODUCTION");
-  row.set('creditsEditedScriptByEmail', member.id);
-  await row.save();
+  const sql = getDb();
+  await sql.query(
+    `UPDATE ideas SET status = 'PRODUCTION', credits_edited_script_by_email = $1 WHERE id = $2`,
+    [member.id, ideaId]
+  );
 
   await recordAuditLog(ideaId, member.id, "Bắt đầu sản xuất SCRIPT -> PRODUCTION", { editor: member.id });
 
-  const assignedTo = row.get('assignedToEmail');
-  if (assignedTo) {
+  if (row.assigned_to_email) {
     await createNotification(
-      assignedTo,
+      row.assigned_to_email,
       'production_started',
       ideaId,
-      `Kịch bản "${row.get('title')}" đã được duyệt! Bắt đầu quay & dựng video ngay nhé.`
+      `Kịch bản "${row.title}" đã được duyệt! Bắt đầu quay & dựng video ngay nhé.`
     );
   }
 
-  await sendDiscordWebhook(`🎬 Kịch bản **"${row.get('title')}"** đã được **${member.name}** duyệt — chính thức bước vào giai đoạn SẢN XUẤT.`);
-
-  revalidateTag("sheets");
+  await sendDiscordWebhook(`🎬 Kịch bản **"${row.title}"** đã được **${member.name}** duyệt — chính thức bước vào giai đoạn SẢN XUẤT.`);
   revalidatePath("/");
 }
 
@@ -219,30 +227,34 @@ export async function submitVideoAction(ideaId: string, videoLink?: string) {
   const member = await getCurrentMember();
   if (!member) throw new Error("Chưa đăng nhập");
 
-  const { row } = await getIdeaRow(ideaId);
+  const row = await getIdeaRow(ideaId);
   if (!row) throw new Error("Không tìm thấy ý tưởng");
-  if (row.get('assignedToEmail') !== member.id || member.role !== "P") {
+  if (row.assigned_to_email !== member.id || member.role !== "P") {
     throw new Error("Chỉ Producer được giao mới có quyền nộp video");
   }
 
-  if (row.get('status') !== "PRODUCTION") {
+  if (row.status !== "PRODUCTION") {
     throw new Error("Chỉ ý tưởng ở trạng thái PRODUCTION mới được nộp video");
   }
 
-  row.set('status', "QA");
-  if (videoLink) {
-    if (!isValidUrl(videoLink.trim())) throw new Error("Link video không hợp lệ. Vui lòng nhập URL hợp lệ bắt đầu bằng http:// hoặc https://");
-    row.set('videoLink', videoLink.trim());
+  if (videoLink && !isValidUrl(videoLink.trim())) {
+    throw new Error("Link video không hợp lệ. Vui lòng nhập URL hợp lệ bắt đầu bằng http:// hoặc https://");
   }
-  row.set('videoSubmittedAt', new Date().toISOString());
-  row.set('creditsProducedByEmail', member.id);
-  await row.save();
+
+  const sql = getDb();
+  const now = new Date().toISOString();
+  await sql.query(
+    `UPDATE ideas SET
+       status = 'QA',
+       video_link = COALESCE($1, video_link),
+       video_submitted_at = $2,
+       credits_produced_by_email = $3
+     WHERE id = $4`,
+    [videoLink ? videoLink.trim() : null, now, member.id, ideaId]
+  );
 
   await recordAuditLog(ideaId, member.id, "Nộp video PRODUCTION -> QA", { videoLink });
-
-  await sendDiscordWebhook(`🎥 Producer **${member.name}** đã nộp video cho **"${row.get('title')}"**. Chờ Ban đào tạo QA kiểm duyệt!`);
-
-  revalidateTag("sheets");
+  await sendDiscordWebhook(`🎥 Producer **${member.name}** đã nộp video cho **"${row.title}"**. Chờ Ban đào tạo QA kiểm duyệt!`);
   revalidatePath("/");
 }
 
@@ -257,34 +269,36 @@ export async function qaPassAction(ideaId: string, publishedLink: string) {
     throw new Error("Bắt buộc phải nhập link sản phẩm đã đăng thật (publishedLink) và phải là một URL hợp lệ");
   }
 
-  const { row } = await getIdeaRow(ideaId);
+  const row = await getIdeaRow(ideaId);
   if (!row) throw new Error("Không tìm thấy ý tưởng");
 
-  if (row.get('status') !== "QA") {
+  if (row.status !== "QA") {
     throw new Error("Chỉ ý tưởng đang ở QA mới có thể đánh giá Đạt");
   }
 
-  row.set('status', "COMPLETE");
-  row.set('qaFeedback', "");
-  row.set('publishedLink', publishedLink.trim());
-  row.set('creditsQaByEmail', member.id);
-  await row.save();
+  const sql = getDb();
+  await sql.query(
+    `UPDATE ideas SET 
+       status = 'COMPLETE',
+       qa_feedback = '',
+       published_link = $1,
+       credits_qa_by_email = $2
+     WHERE id = $3`,
+    [publishedLink.trim(), member.id, ideaId]
+  );
 
   await recordAuditLog(ideaId, member.id, "QA Đạt QA -> COMPLETE", { publishedLink: publishedLink.trim() });
 
-  const assignedTo = row.get('assignedToEmail');
-  if (assignedTo) {
+  if (row.assigned_to_email) {
     await createNotification(
-      assignedTo,
+      row.assigned_to_email,
       'qa_pass',
       ideaId,
-      `🎉 Video "${row.get('title')}" đã ĐẠT kiểm duyệt QA và hoàn thành xuất sắc!`
+      `🎉 Video "${row.title}" đã ĐẠT kiểm duyệt QA và hoàn thành xuất sắc!`
     );
   }
 
-  await sendDiscordWebhook(`🎉 **HOÀN THÀNH SẢN PHẨM:** Ý tưởng **"${row.get('title')}"** đã được duyệt QA và đăng tải thành công!\n🔗 Minh chứng: ${publishedLink.trim()}`);
-
-  revalidateTag("sheets");
+  await sendDiscordWebhook(`🎉 **HOÀN THÀNH SẢN PHẨM:** Ý tưởng **"${row.title}"** đã được duyệt QA và đăng tải thành công!\n🔗 Minh chứng: ${publishedLink.trim()}`);
   revalidatePath("/");
 }
 
@@ -299,32 +313,31 @@ export async function qaFailAction(ideaId: string, qaFeedback: string) {
     throw new Error("Bắt buộc phải nhập lý do chi tiết khi đánh giá Chưa đạt");
   }
 
-  const { row } = await getIdeaRow(ideaId);
+  const row = await getIdeaRow(ideaId);
   if (!row) throw new Error("Không tìm thấy ý tưởng");
 
-  if (row.get('status') !== "QA") {
+  if (row.status !== "QA") {
     throw new Error("Chỉ ý tưởng đang ở QA mới có thể đánh giá");
   }
 
-  row.set('status', "PRODUCTION");
-  row.set('qaFeedback', qaFeedback.trim());
-  await row.save();
+  const sql = getDb();
+  await sql.query(
+    `UPDATE ideas SET status = 'PRODUCTION', qa_feedback = $1 WHERE id = $2`,
+    [qaFeedback.trim(), ideaId]
+  );
 
   await recordAuditLog(ideaId, member.id, "QA Chưa đạt QA -> PRODUCTION", { qaFeedback: qaFeedback.trim() });
 
-  const assignedTo = row.get('assignedToEmail');
-  if (assignedTo) {
+  if (row.assigned_to_email) {
     await createNotification(
-      assignedTo,
+      row.assigned_to_email,
       'qa_fail',
       ideaId,
-      `⚠️ Video "${row.get('title')}" chưa đạt QA: "${qaFeedback.trim()}". Vui lòng sửa lại trong PRODUCTION.`
+      `⚠️ Video "${row.title}" chưa đạt QA: "${qaFeedback.trim()}". Vui lòng sửa lại trong PRODUCTION.`
     );
   }
 
-  await sendDiscordWebhook(`⚠️ Video **"${row.get('title')}"** chưa đạt QA bởi **${member.name}**.\n> Ghi chú sửa: ${qaFeedback.trim()}`);
-
-  revalidateTag("sheets");
+  await sendDiscordWebhook(`⚠️ Video **"${row.title}"** chưa đạt QA bởi **${member.name}**.\n> Ghi chú sửa: ${qaFeedback.trim()}`);
   revalidatePath("/");
 }
 
@@ -337,12 +350,12 @@ export async function reassignIdeaAction(ideaId: string, newAssigneeEmail: strin
     throw new Error("Bắt buộc phải chọn 1 người phụ trách mới");
   }
 
-  const { row } = await getIdeaRow(ideaId);
+  const row = await getIdeaRow(ideaId);
   if (!row) throw new Error("Không tìm thấy ý tưởng");
 
-  const oldAssignee = row.get('assignedToEmail');
-  row.set('assignedToEmail', newAssigneeEmail.trim());
-  await row.save();
+  const oldAssignee = row.assigned_to_email;
+  const sql = getDb();
+  await sql.query(`UPDATE ideas SET assigned_to_email = $1 WHERE id = $2`, [newAssigneeEmail.trim(), ideaId]);
 
   await recordAuditLog(ideaId, member.id, "Chuyển giao ý tưởng", { from: oldAssignee, to: newAssigneeEmail });
 
@@ -350,12 +363,10 @@ export async function reassignIdeaAction(ideaId: string, newAssigneeEmail: strin
     newAssigneeEmail,
     'assigned',
     ideaId,
-    `Bạn đã được gán phụ trách ý tưởng "${row.get('title')}" thay cho ${oldAssignee}`
+    `Bạn đã được gán phụ trách ý tưởng "${row.title}" thay cho ${oldAssignee}`
   );
 
-  await sendDiscordWebhook(`🔄 Ý tưởng **"${row.get('title')}"** đã được chuyển giao cho **${newAssigneeEmail}** (Người cũ: ${oldAssignee || "Không có"})`);
-
-  revalidateTag("sheets");
+  await sendDiscordWebhook(`🔄 Ý tưởng **"${row.title}"** đã được chuyển giao cho **${newAssigneeEmail}** (Người cũ: ${oldAssignee || "Không có"})`);
   revalidatePath("/");
 }
 
@@ -370,25 +381,26 @@ export async function updateIdeaDetailsAction(
   const member = await getCurrentMember();
   if (!member) throw new Error("Chưa đăng nhập");
 
-  const { row } = await getIdeaRow(ideaId);
+  const row = await getIdeaRow(ideaId);
   if (!row) throw new Error("Không tìm thấy ý tưởng");
 
-  const canEdit = member.role === "Core" || member.role === "E" || (row.get('status') === "PITCH" && row.get('submittedByEmail') === member.id);
+  const canEdit = member.role === "Core" || member.role === "E" || (row.status === "PITCH" && row.submitted_by_email === member.id);
   if (!canEdit) throw new Error("Bạn không có quyền sửa thông tin ý tưởng này");
 
-  row.set('title', title.trim());
-  row.set('description', description.trim());
-  if (platformChannelId) row.set('platformChannelId', platformChannelId.trim());
-  row.set('tags', tags.trim());
+  const sql = getDb();
   if (member.role === "Core") {
-    row.set('internalNote', internalNote.trim());
+    await sql.query(
+      `UPDATE ideas SET title = $1, description = $2, platform_channel_id = $3, tags = $4, internal_note = $5 WHERE id = $6`,
+      [title.trim(), description.trim(), platformChannelId.trim(), tags.trim(), internalNote.trim(), ideaId]
+    );
+  } else {
+    await sql.query(
+      `UPDATE ideas SET title = $1, description = $2, platform_channel_id = $3, tags = $4 WHERE id = $5`,
+      [title.trim(), description.trim(), platformChannelId.trim(), tags.trim(), ideaId]
+    );
   }
-  
-  await row.save();
 
   await recordAuditLog(ideaId, member.id, "Cập nhật thông tin ý tưởng", { title, platformChannelId, tags });
-
-  revalidateTag("sheets");
   revalidatePath("/");
 }
 
@@ -397,28 +409,25 @@ export async function extendDeadlineAction(ideaId: string, newEndDate: string) {
   if (!member) throw new Error("Chưa đăng nhập");
   if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền gia hạn deadline");
 
-  const { row } = await getIdeaRow(ideaId);
+  const row = await getIdeaRow(ideaId);
   if (!row) throw new Error("Không tìm thấy ý tưởng");
 
-  const oldEndDate = row.get('endDate');
-  row.set('endDate', newEndDate);
-  await row.save();
+  const oldEndDate = row.end_date;
+  const sql = getDb();
+  await sql.query(`UPDATE ideas SET end_date = $1 WHERE id = $2`, [newEndDate, ideaId]);
 
   await recordAuditLog(ideaId, member.id, "Gia hạn deadline", { oldEndDate, newEndDate });
 
-  const assignedTo = row.get('assignedToEmail');
-  if (assignedTo) {
+  if (row.assigned_to_email) {
     await createNotification(
-      assignedTo,
+      row.assigned_to_email,
       'info',
       ideaId,
-      `⏰ Deadline của ý tưởng "${row.get('title')}" đã được dời sang ${newEndDate}`
+      `⏰ Deadline của ý tưởng "${row.title}" đã được dời sang ${newEndDate}`
     );
   }
 
-  await sendDiscordWebhook(`⏰ Deadline ý tưởng **"${row.get('title')}"** được dời sang **${newEndDate}** bởi ${member.name}`);
-
-  revalidateTag("sheets");
+  await sendDiscordWebhook(`⏰ Deadline ý tưởng **"${row.title}"** được dời sang **${newEndDate}** bởi ${member.name}`);
   revalidatePath("/");
 }
 
@@ -427,15 +436,13 @@ export async function updateScheduledPostDateAction(ideaId: string, scheduledPos
   if (!member) throw new Error("Chưa đăng nhập");
   if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền lên lịch ngày đăng bài");
 
-  const { row } = await getIdeaRow(ideaId);
+  const row = await getIdeaRow(ideaId);
   if (!row) throw new Error("Không tìm thấy ý tưởng");
 
-  row.set('scheduledPostDate', scheduledPostDate || '');
-  await row.save();
+  const sql = getDb();
+  await sql.query(`UPDATE ideas SET scheduled_post_date = $1 WHERE id = $2`, [scheduledPostDate || '', ideaId]);
 
   await recordAuditLog(ideaId, member.id, "Cập nhật lịch đăng bài", { scheduledPostDate });
-
-  revalidateTag("sheets");
   revalidatePath("/");
 }
 
@@ -444,28 +451,22 @@ export async function archiveUnselectedIdeasAction() {
   if (!member) throw new Error("Chưa đăng nhập");
   if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền thực hiện lưu trữ ý tưởng");
 
-  const doc = await getSpreadsheet();
-  const sheet = doc.sheetsByTitle["Ideas"];
-  if (!sheet) return;
-
-  const rows = await sheet.getRows();
+  const sql = getDb();
   const twoWeeksAgo = new Date();
   twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
 
-  let archivedCount = 0;
-  for (const row of rows) {
-    if (row.get('status') === "PITCH") {
-      const createdAt = new Date(row.get('createdAt') || row.get('lastPitchWeek') || '2026-01-01');
-      if (createdAt < twoWeeksAgo) {
-        row.set('status', "ARCHIVED_IDEA");
-        await row.save();
-        archivedCount++;
-        await recordAuditLog(row.get('id'), member.id, "Tự động lưu trữ ý tưởng sau 2 tuần PITCH");
-      }
-    }
+  const res = await sql.query(
+    `UPDATE ideas SET status = 'ARCHIVED_IDEA'
+     WHERE status = 'PITCH' AND CAST(COALESCE(created_at, '2026-01-01') AS TIMESTAMPTZ) < $1
+     RETURNING id`,
+    [twoWeeksAgo.toISOString()]
+  );
+
+  const archivedCount = res.length;
+  for (const r of (res as any[])) {
+    await recordAuditLog(r.id, member.id, "Tự động lưu trữ ý tưởng sau 2 tuần PITCH");
   }
 
-  revalidateTag("sheets");
   revalidatePath("/");
   return { archivedCount };
 }
@@ -475,16 +476,17 @@ export async function restoreArchivedIdeaAction(ideaId: string) {
   if (!member) throw new Error("Chưa đăng nhập");
   if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền khôi phục ý tưởng lưu trữ");
 
-  const { row } = await getIdeaRow(ideaId);
+  const row = await getIdeaRow(ideaId);
   if (!row) throw new Error("Không tìm thấy ý tưởng");
 
-  row.set('status', "PITCH");
-  row.set('lastPitchWeek', new Date().toISOString().slice(0, 10));
-  await row.save();
+  const sql = getDb();
+  const nowStr = new Date().toISOString().slice(0, 10);
+  await sql.query(
+    `UPDATE ideas SET status = 'PITCH', last_pitch_week = $1 WHERE id = $2`,
+    [nowStr, ideaId]
+  );
 
   await recordAuditLog(ideaId, member.id, "Khôi phục ý tưởng lưu trữ vào PITCH");
-
-  revalidateTag("sheets");
   revalidatePath("/");
 }
 
@@ -492,17 +494,17 @@ export async function deleteIdeaAction(ideaId: string) {
   const member = await getCurrentMember();
   if (!member) throw new Error("Chưa đăng nhập");
 
-  const { row } = await getIdeaRow(ideaId);
+  const row = await getIdeaRow(ideaId);
   if (!row) throw new Error("Không tìm thấy ý tưởng");
 
-  const canDelete = member.role === "Core" || member.role === "E" || (row.get('status') === "PITCH" && row.get('submittedByEmail') === member.id);
+  const canDelete = member.role === "Core" || member.role === "E" || (row.status === "PITCH" && row.submitted_by_email === member.id);
   if (!canDelete) {
     throw new Error("Bạn không có quyền xoá ý tưởng này");
   }
 
-  await recordAuditLog(ideaId, member.id, "Xoá ý tưởng khỏi hệ thống", { title: row.get('title') });
-  await row.delete();
-  revalidateTag("sheets");
+  const sql = getDb();
+  await sql.query(`DELETE FROM ideas WHERE id = $1`, [ideaId]);
+  await recordAuditLog(ideaId, member.id, "Xoá ý tưởng khỏi hệ thống", { title: row.title });
   revalidatePath("/");
 }
 
@@ -510,26 +512,31 @@ export async function cancelIdeaAction(ideaId: string, reason: string) {
   const member = await getCurrentMember();
   if (!member) throw new Error("Chưa đăng nhập");
 
-  const { row } = await getIdeaRow(ideaId);
+  const row = await getIdeaRow(ideaId);
   if (!row) throw new Error("Không tìm thấy ý tưởng");
 
-  if (row.get('status') === "COMPLETE") {
+  if (row.status === "COMPLETE") {
     throw new Error("Không thể huỷ ý tưởng đã hoàn thành");
   }
 
-  const canCancel = member.role === "Core" || member.role === "E" || (row.get('status') === "PITCH" && row.get('submittedByEmail') === member.id);
+  const canCancel = member.role === "Core" || member.role === "E" || (row.status === "PITCH" && row.submitted_by_email === member.id);
   if (!canCancel) {
     throw new Error("Bạn không có quyền huỷ ý tưởng này");
   }
 
-  row.set('status', "CANCELLED");
-  row.set('cancelReason', reason || "");
-  row.set('cancelledByEmail', member.id);
-  row.set('cancelledAt', new Date().toISOString());
-  
-  await row.save();
+  const sql = getDb();
+  const now = new Date().toISOString();
+  await sql.query(
+    `UPDATE ideas SET 
+       status = 'CANCELLED',
+       cancel_reason = $1,
+       cancelled_by_email = $2,
+       cancelled_at = $3
+     WHERE id = $4`,
+    [reason || "", member.id, now, ideaId]
+  );
+
   await recordAuditLog(ideaId, member.id, "Huỷ ý tưởng", { reason });
-  revalidateTag("sheets");
   revalidatePath("/");
 }
 
@@ -538,14 +545,13 @@ export async function updateIdeaNoteAction(ideaId: string, internalNote: string)
   if (!member) throw new Error("Chưa đăng nhập");
   if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền sửa ghi chú nội bộ");
 
-  const { row } = await getIdeaRow(ideaId);
+  const row = await getIdeaRow(ideaId);
   if (!row) throw new Error("Không tìm thấy ý tưởng");
 
-  row.set('internalNote', internalNote.trim());
-  await row.save();
+  const sql = getDb();
+  await sql.query(`UPDATE ideas SET internal_note = $1 WHERE id = $2`, [internalNote.trim(), ideaId]);
 
   await recordAuditLog(ideaId, member.id, "Cập nhật ghi chú nội bộ");
-  revalidateTag("sheets");
   revalidatePath("/");
 }
 
@@ -556,15 +562,14 @@ export async function rateIdeaAction(ideaId: string, rating: number) {
 
   if (rating < 1 || rating > 5) throw new Error("Điểm đánh giá phải từ 1 đến 5 sao");
 
-  const { row } = await getIdeaRow(ideaId);
+  const row = await getIdeaRow(ideaId);
   if (!row) throw new Error("Không tìm thấy ý tưởng");
-  if (row.get('status') !== "COMPLETE") throw new Error("Chỉ có thể đánh giá ý tưởng đã hoàn thành");
+  if (row.status !== "COMPLETE") throw new Error("Chỉ có thể đánh giá ý tưởng đã hoàn thành");
 
-  row.set('rating', rating.toString());
-  await row.save();
+  const sql = getDb();
+  await sql.query(`UPDATE ideas SET rating = $1 WHERE id = $2`, [rating, ideaId]);
 
   await recordAuditLog(ideaId, member.id, `Đánh giá sản phẩm ${rating} sao`);
-  revalidateTag("sheets");
   revalidatePath("/");
 }
 
@@ -572,43 +577,40 @@ export async function cloneIdeaAction(ideaId: string) {
   const member = await getCurrentMember();
   if (!member) throw new Error("Chưa đăng nhập");
 
-  const doc = await getSpreadsheet();
-  const sheet = doc.sheetsByTitle["Ideas"];
-  if (!sheet) throw new Error("Thiếu tab Ideas");
-  const rows = await sheet.getRows();
-  const sourceRow = rows.find(r => r.get('id') === ideaId);
-  
+  const sourceRow = await getIdeaRow(ideaId);
   if (!sourceRow) throw new Error("Không tìm thấy ý tưởng gốc");
 
   const newIdeaId = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  await sheet.addRow({
-    id: newIdeaId,
-    title: sourceRow.get('title') + " (Copy)",
-    description: sourceRow.get('description') || '',
-    platformChannelId: sourceRow.get('platformChannelId') || '',
-    submittedByEmail: member.id,
-    status: "PITCH",
-    createdAt: now,
-    creditsIdeaByEmail: member.id,
-    lastPitchWeek: now.slice(0, 10),
-    tags: sourceRow.get('tags') || ''
-  });
+  const sql = getDb();
+  await sql.query(
+    `INSERT INTO ideas (
+      id, title, description, platform_channel_id, submitted_by_email,
+      status, created_at, credits_idea_by_email, last_pitch_week, tags
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [
+      newIdeaId,
+      sourceRow.title + " (Copy)",
+      sourceRow.description || '',
+      sourceRow.platform_channel_id || '',
+      member.id,
+      "PITCH",
+      now,
+      member.id,
+      now.slice(0, 10),
+      sourceRow.tags || ''
+    ]
+  );
 
-  await recordAuditLog(newIdeaId, member.id, "Nhân bản ý tưởng từ " + sourceRow.get('title'), { sourceId: ideaId });
-  revalidateTag("sheets");
+  await recordAuditLog(newIdeaId, member.id, "Nhân bản ý tưởng từ " + sourceRow.title, { sourceId: ideaId });
   revalidatePath("/");
   return { success: true, id: newIdeaId };
 }
 
-
 export async function triggerDailyCronAction() {
-  const doc = await getSpreadsheet();
-  const ideaSheet = doc.sheetsByTitle["Ideas"];
-  if (!ideaSheet) return;
-
-  const rows = await ideaSheet.getRows();
+  const sql = getDb();
+  const rows = await sql.query(`SELECT * FROM ideas`);
   let updated = false;
 
   const today = new Date();
@@ -616,25 +618,22 @@ export async function triggerDailyCronAction() {
 
   const twoWeeksAgo = new Date(today);
   twoWeeksAgo.setDate(today.getDate() - 14);
-  const nowStr = new Date().toISOString().slice(0, 10);
 
-  for (const row of rows) {
-    const status = row.get('status');
-    const pitchWeek = row.get('lastPitchWeek');
-    const assignedTo = row.get('assignedToEmail');
-    const ideaId = row.get('id');
-    const endDateStr = row.get('endDate');
+  for (const row of (rows as any[])) {
+    const status = row.status;
+    const pitchWeek = row.last_pitch_week;
+    const assignedTo = row.assigned_to_email;
+    const ideaId = row.id;
+    const endDateStr = row.end_date;
     
     // Auto-archive old PITCH
     if (status === 'PITCH') {
-      const pitchDateStr = pitchWeek || row.get('createdAt');
+      const pitchDateStr = pitchWeek || row.created_at;
       if (pitchDateStr) {
         const pitchDate = new Date(pitchDateStr);
         if (pitchDate < twoWeeksAgo) {
-          row.set('status', 'ARCHIVED_IDEA');
-          await row.save();
+          await sql.query(`UPDATE ideas SET status = 'ARCHIVED_IDEA' WHERE id = $1`, [ideaId]);
           updated = true;
-          
           await recordAuditLog(ideaId, "SYSTEM", "Tự động lưu trữ ý tưởng PITCH quá hạn (14 ngày)", {});
         }
       }
@@ -644,8 +643,6 @@ export async function triggerDailyCronAction() {
     if ((status === 'ASSIGNMENT' || status === 'SCRIPT' || status === 'PRODUCTION' || status === 'QA') && endDateStr) {
       const endDate = new Date(endDateStr);
       if (endDate < today && assignedTo) {
-        // Find if we already notified today (check Notifications sheet logic is hard without querying it all, 
-        // but let's assume we can just create it. To prevent spam, client rate-limits to 1 per day).
         await createNotification(
           assignedTo, 
           'warning', 
@@ -657,8 +654,8 @@ export async function triggerDailyCronAction() {
   }
 
   if (updated) {
-    revalidateTag("sheets");
     revalidatePath("/");
   }
   return { success: true };
 }
+

@@ -615,12 +615,25 @@ export default function ClientApp({
 
   const router = useRouter();
 
-  // Auto-refresh polling every 30s
+  // Auto-refresh polling (only when tab is active/visible)
   useEffect(() => {
     const id = setInterval(() => {
-      router.refresh();
-    }, 30000);
-    return () => clearInterval(id);
+      if (document.visibilityState === 'visible') {
+        router.refresh();
+      }
+    }, 45000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        router.refresh();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [router]);
 
   // Action runner
