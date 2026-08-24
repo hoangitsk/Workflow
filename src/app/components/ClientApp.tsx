@@ -220,7 +220,12 @@ function LoginScreen() {
       const email = (form.elements.namedItem("email") as HTMLInputElement).value;
       const password = (form.elements.namedItem("password") as HTMLInputElement).value;
       
-      await loginWithCredentialsAction(email, password);
+      const res = await loginWithCredentialsAction(email, password);
+      if (res && res.error) {
+        setErrorMsg(res.error);
+        setLoading(false);
+        return;
+      }
       window.location.reload();
     } catch (err: any) {
       console.error(err);
@@ -474,7 +479,11 @@ export default function ClientApp({
   const runAction = (fn: any, ...args: any) => {
     startTransition(async () => {
       try {
-        await fn(...args);
+        const res = await fn(...args);
+        if (res && res.error) {
+          alert(res.error);
+          return;
+        }
         router.refresh(); // Trigger immediate server re-render
       } catch (err: any) {
         alert(err.message || "Có lỗi xảy ra");

@@ -19,12 +19,12 @@ export async function loginWithCredentialsAction(emailOrUsername: string, passwo
     if (Date.now() - attempt.lastTry > LOCK_TIME_MS) attempt.count = 0;
     if (attempt.count >= MAX_ATTEMPTS) {
       const remainingMinutes = Math.ceil((LOCK_TIME_MS - (Date.now() - attempt.lastTry)) / 60000);
-      throw new Error(`Thử quá nhiều lần. Vui lòng thử lại sau ${remainingMinutes} phút.`);
+      return { error: `Thử quá nhiều lần. Vui lòng thử lại sau ${remainingMinutes} phút.` };
     }
 
     const doc = await getSpreadsheet();
     const sheet = doc.sheetsByTitle["Members"];
-    if (!sheet) throw new Error("Database thiếu tab 'Members'");
+    if (!sheet) return { error: "Database thiếu tab 'Members'" };
 
     const rows = await sheet.getRows();
     const member = rows.find(r => {
@@ -35,13 +35,13 @@ export async function loginWithCredentialsAction(emailOrUsername: string, passwo
     
     if (!member) {
       recordFailure(query, attempt);
-      throw new Error(`Tài khoản ${emailOrUsername} không tồn tại trong hệ thống.`);
+      return { error: `Tài khoản ${emailOrUsername} không tồn tại trong hệ thống.` };
     }
 
     const isActive = member.get('active') !== 'FALSE' && member.get('active') !== 'false';
     if (!isActive) {
       recordFailure(query, attempt);
-      throw new Error("Tài khoản này đã bị vô hiệu hóa / ngừng hoạt động. Vui lòng liên hệ Core.");
+      return { error: "Tài khoản này đã bị vô hiệu hóa / ngừng hoạt động. Vui lòng liên hệ Core." };
     }
 
     const savedPassword = member.get('password');
@@ -53,7 +53,7 @@ export async function loginWithCredentialsAction(emailOrUsername: string, passwo
 
     if (!expectedPassword) {
       recordFailure(query, attempt);
-      throw new Error(`Tài khoản ${emailOrUsername} chưa thiết lập mật khẩu.`);
+      return { error: `Tài khoản ${emailOrUsername} chưa thiết lập mật khẩu.` };
     }
 
     const isHash = expectedPassword.startsWith("$2a$") || expectedPassword.startsWith("$2b$");
@@ -67,7 +67,7 @@ export async function loginWithCredentialsAction(emailOrUsername: string, passwo
 
     if (!isMatch) {
       recordFailure(query, attempt);
-      throw new Error("Sai mật khẩu hoặc số điện thoại xác thực.");
+      return { error: "Sai mật khẩu hoặc số điện thoại xác thực." };
     }
 
     // Success, reset attempts
@@ -84,7 +84,7 @@ export async function loginWithCredentialsAction(emailOrUsername: string, passwo
     return true;
   } catch (err: any) {
     console.error("Login Error:", err);
-    throw new Error(err.message || "Đăng nhập thất bại");
+    return { error: err.message || "Đăng nhập thất bại" };
   }
 }
 
