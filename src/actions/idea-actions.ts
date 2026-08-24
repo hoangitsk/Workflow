@@ -531,7 +531,8 @@ export async function cancelIdeaAction(ideaId: string, reason: string) {
        status = 'CANCELLED',
        cancel_reason = $1,
        cancelled_by_email = $2,
-       cancelled_at = $3
+       cancelled_at = $3,
+       scheduled_post_date = ''
      WHERE id = $4`,
     [reason || "", member.id, now, ideaId]
   );

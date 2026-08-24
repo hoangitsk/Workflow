@@ -3164,7 +3164,11 @@ function ContentCalendarView({
   onOpenIdea,
   onSchedulePost
 }: any) {
-  const scheduledIdeas = ideas.filter((i: Idea) => i.scheduledPostDate || i.status === "COMPLETE");
+  const scheduledIdeas = ideas.filter((i: Idea) => 
+    i.status !== "CANCELLED" && 
+    i.status !== "ARCHIVED_IDEA" && 
+    (Boolean(i.scheduledPostDate) || i.status === "COMPLETE")
+  );
 
   return (
     <div className="space-y-4">
