@@ -399,9 +399,12 @@ export default function ClientApp({
       const today = new Date().toISOString().slice(0, 10);
       const lastRun = localStorage.getItem(`cron_${actor.id}`);
       if (lastRun !== today) {
-        runAction(triggerDailyCronAction).then(() => {
+        try {
+          runAction(triggerDailyCronAction);
           localStorage.setItem(`cron_${actor.id}`, today);
-        }).catch(err => console.error("Cron failed", err));
+        } catch (err) {
+          console.error("Cron failed", err);
+        }
       }
     }
   }, [actor]);
