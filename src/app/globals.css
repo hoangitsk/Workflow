@@ -2,38 +2,41 @@
 @import "tailwindcss";
 
 :root {
-  --background: #080B11;
-  --foreground: #F8FAFC;
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+  --surface: #FFFFFF;
+  --sidebar: #F1F5F9;
+  --border: #E2E8F0;
   --font-brand: 'Cinzel', serif;
   --font-sans: 'Plus Jakarta Sans', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
 
 body {
-  background: #080B11;
-  color: #F8FAFC;
+  background: #F8FAFC;
+  color: #0F172A;
   font-family: var(--font-sans);
   min-height: 100vh;
   overflow-x: hidden;
 }
 
-/* Custom Cinema Scrollbars */
+/* Crisp Clean Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(16, 22, 34, 0.6);
+  background: #F1F5F9;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #222E44;
+  background: #CBD5E1;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3B4B6E;
+  background: #94A3B8;
 }
 
 /* Hide scrollbar for tabs */
@@ -45,21 +48,31 @@ body {
   scrollbar-width: none;
 }
 
-/* Cinema Lighting & Gradients */
-.gold-glow {
-  box-shadow: 0 0 25px rgba(229, 192, 88, 0.2);
+/* Slide-over Drawer Animations */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
-.gold-gradient-text {
-  background: linear-gradient(135deg, #FFF0B3 0%, #E5C058 50%, #B8860B 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.animate-slide-in-right {
+  animation: slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.gold-border {
-  border: 1px solid rgba(229, 192, 88, 0.35);
+/* Card & Table Shadows */
+.saas-shadow {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
 }
 
-.gold-border-subtle {
-  border: 1px solid rgba(229, 192, 88, 0.18);
+.saas-shadow-md {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+}
+
+.saas-shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
 }
