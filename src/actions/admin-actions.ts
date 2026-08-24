@@ -190,6 +190,68 @@ export async function createMemberAction(
   revalidatePath("/");
 }
 
+// Bulk import members from CSV data (parsed client-side)
+export async function bulkImportMembersAction(
+  rows: { name: string; email: string; role: string; password?: string; phone?: string; facebook?: string; primaryExpertise?: string; secondaryExpertise?: string }[]
+) {
+  const member = await getCurrentMember();
+  if (!member) throw new Error("Chưa đăng nhập");
+  if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền import thành viên");
+
+  if (!rows || rows.length === 0) throw new Error("Không có dữ liệu để import");
+  if (rows.length > 50) throw new Error("Tối đa 50 thành viên mỗi lần import");
+
+  const doc = await getSpreadsheet();
+  const sheet = doc.sheetsByTitle["Members"];
+  if (!sheet) throw new Error("Thiếu tab Members");
+
+  const existingRows = await sheet.getRows();
+  const existingEmails = new Set(existingRows.map(r => (r.get('id') || '').toLowerCase().trim()));
+
+  let imported = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  for (const row of rows) {
+    const cleanEmail = (row.email || '').toLowerCase().trim();
+    const cleanName = (row.name || '').trim();
+    
+    if (!cleanEmail || !cleanName) {
+      skipped++;
+      continue;
+    }
+
+    if (existingEmails.has(cleanEmail)) {
+      errors.push(`${cleanEmail} đã tồn tại`);
+      skipped++;
+      continue;
+    }
+
+    const validRoles = ["Core", "E", "Editor", "P", "Producer"];
+    const role = validRoles.includes(row.role) ? row.role : "P";
+
+    await sheet.addRow({
+      id: cleanEmail,
+      name: cleanName,
+      role: role === "Editor" ? "E" : (role === "Producer" ? "P" : role),
+      password: (row.password || '').trim() || "123",
+      phone: row.phone || "",
+      facebook: row.facebook || "",
+      primaryExpertise: row.primaryExpertise || "",
+      secondaryExpertise: row.secondaryExpertise || "",
+      active: "TRUE"
+    });
+    
+    existingEmails.add(cleanEmail);
+    imported++;
+  }
+
+  await recordAuditLog('', member.id, `Import hàng loạt ${imported} thành viên`, { total: rows.length, imported, skipped, errors });
+  revalidatePath("/");
+  
+  return { imported, skipped, errors };
+}
+
 export async function updateMemberProfileAction(
   memberId: string,
   name: string,

@@ -11,7 +11,7 @@ import {
   BarChart3, RefreshCw, Eye, Sparkles, Clock, Check, CalendarDays, Layers,
   Star, Video, Play, ArrowRight, Compass, ShieldAlert, Sparkle, UserCheck,
   FileText, CheckSquare, MessageCircle, MoreVertical, ChevronDown, CheckCheck,
-  Inbox, Menu, ArrowUpRight, Hash, Flame, TrendingUp
+  Inbox, Menu, ArrowUpRight, Hash, Flame, TrendingUp, Download, Upload
 } from "lucide-react";
 
 import { loginWithCredentialsAction, logoutAction, changePasswordAction } from "../../actions/auth-actions";
@@ -19,17 +19,18 @@ import {
   submitIdeaAction, approveIdeaAction, submitScriptAction, startProductionAction, 
   submitVideoAction, qaPassAction, qaFailAction, deleteIdeaAction, cancelIdeaAction,
   archiveUnselectedIdeasAction, restoreArchivedIdeaAction, updateScheduledPostDateAction, 
-  triggerDailyCronAction, reassignIdeaAction, updateIdeaDetailsAction, extendDeadlineAction
+  triggerDailyCronAction, reassignIdeaAction, updateIdeaDetailsAction, extendDeadlineAction,
+  updateIdeaNoteAction, rateIdeaAction, cloneIdeaAction
 } from "../../actions/idea-actions";
 import { 
   createChannelGroupAction, archiveChannelGroupAction, restoreChannelGroupAction, 
   createPlatformAction, createMemberAction, removeMemberAction, updateMemberProfileAction, 
-  toggleMemberActiveAction, updateSettingsAction 
+  toggleMemberActiveAction, updateSettingsAction, bulkImportMembersAction 
 } from "../../actions/admin-actions";
 import { addCommentAction } from "../../actions/comment-actions";
 import { markNotificationAsReadAction, markAllNotificationsAsReadAction } from "../../actions/notification-actions";
 import { sendWeeklyReportToDiscordAction } from "../../actions/report-actions";
-import { createChecklistAction, updateChecklistStatusAction, deleteChecklistAction } from "../../actions/checklist-actions";
+import { createChecklistAction, updateChecklistStatusAction, deleteChecklistAction, updateChecklistDetailsAction } from "../../actions/checklist-actions";
 import { Member, Platform, ChannelGroup, PlatformChannel, Idea, CommentItem, AuditLogItem, NotificationItem, ChecklistItem, AppSettings, Role } from "../../lib/types";
 
 /* ---------------------------------------------------------------------
@@ -460,6 +461,9 @@ export default function ClientApp({
   const checklists = initialChecklists || [];
   const settings = initialSettings || { discordWebhookUrl: '', externalCalendarUrl: '' };
 
+  // Mobile sidebar toggle
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   // Tab navigation
   const [tab, setTab] = useState("dashboard"); // "dashboard" | "board" | "gantt" | "timeline" | "calendar" | "reports" | "members" | "portfolio"
   
@@ -660,10 +664,19 @@ export default function ClientApp({
   return (
     <div className="min-h-screen flex bg-[#F8FAFC] text-[#0F172A]" style={{ fontFamily: "var(--font-sans, sans-serif)" }}>
 
+      {/* MOBILE SIDEBAR OVERLAY BACKDROP */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/30 z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)} 
+        />
+      )}
+
       {/* -------------------------------------------------------------
          FIXED LEFT SIDEBAR (Width: 240px, Background: #F1F5F9)
+         On mobile: off-canvas overlay, toggled by hamburger
       ------------------------------------------------------------- */}
-      <aside className="w-60 shrink-0 bg-[#F1F5F9] border-r border-[#E2E8F0] flex flex-col h-screen sticky top-0 z-30 select-none">
+      <aside className={`w-60 shrink-0 bg-[#F1F5F9] border-r border-[#E2E8F0] flex flex-col h-screen select-none transition-transform duration-200 ease-out fixed top-0 left-0 z-50 md:sticky md:z-30 md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         
         {/* TOP SIDEBAR: LOGO + WORKSPACE NAME */}
         <div className="px-4 py-3.5 border-b border-[#E2E8F0] flex items-center gap-2.5 bg-[#F1F5F9]">
@@ -700,6 +713,7 @@ export default function ClientApp({
                       } else {
                         setTab(item.id);
                       }
+                      setSidebarOpen(false);
                     }}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       isActive 
@@ -734,7 +748,7 @@ export default function ClientApp({
                 return (
                   <button
                     key={item.id}
-                    onClick={() => setTab(item.id)}
+                    onClick={() => { setTab(item.id); setSidebarOpen(false); }}
                     className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       isActive 
                         ? "bg-white text-[#0F172A] saas-shadow font-semibold" 
@@ -811,13 +825,21 @@ export default function ClientApp({
       {/* -------------------------------------------------------------
          RIGHT MAIN CONTAINER (Header 48px + Content Stage)
       ------------------------------------------------------------- */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen md:ml-0">
         
         {/* TOP HEADER (Height: 48px, Background: #FFFFFF) */}
-        <header className="h-12 sticky top-0 z-20 bg-white border-b border-[#E2E8F0] px-5 flex items-center justify-between gap-4">
+        <header className="h-12 sticky top-0 z-20 bg-white border-b border-[#E2E8F0] px-3 sm:px-5 flex items-center justify-between gap-2 sm:gap-4">
           
+          {/* Mobile Hamburger */}
+          <button 
+            onClick={() => setSidebarOpen(true)}
+            className="md:hidden p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
+            aria-label="Mở menu">
+            <Menu size={18} />
+          </button>
+
           {/* Breadcrumb Navigation */}
-          <div className="flex items-center gap-1.5 text-xs text-[#64748B]">
+          <div className="flex items-center gap-1.5 text-xs text-[#64748B] min-w-0">
             <span className="font-medium text-slate-500">Ý Niệm Điện Ảnh</span>
             <ChevronRight size={13} className="text-slate-400" />
             <span className="font-bold text-[#0F172A]">{activeTabTitle}</span>
@@ -834,9 +856,64 @@ export default function ClientApp({
               placeholder="Tìm ý tưởng, kịch bản... (Ctrl + K)"
               className="w-full pl-8 pr-14 py-1 text-xs rounded-lg border border-slate-200 bg-[#F8FAFC] text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-slate-900 focus:outline-none transition-all"
             />
-            <kbd className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-mono bg-white border border-slate-200 text-slate-500 px-1 py-0.5 rounded shadow-2xs">
-              Ctrl K
-            </kbd>
+            {searchQuery.trim() ? (
+              <button 
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-slate-400 hover:text-slate-700">
+                <X size={12} />
+              </button>
+            ) : (
+              <kbd className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-mono bg-white border border-slate-200 text-slate-500 px-1 py-0.5 rounded shadow-2xs">
+                Ctrl K
+              </kbd>
+            )}
+
+            {/* Instant Search Results Dropdown */}
+            {searchQuery.trim().length > 0 && (
+              <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 max-h-72 overflow-y-auto p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-150">
+                {(() => {
+                  const q = searchQuery.toLowerCase().trim();
+                  const matches = ideas.filter((i: Idea) => 
+                    i.title.toLowerCase().includes(q) || (i.description || "").toLowerCase().includes(q)
+                  ).slice(0, 8);
+
+                  if (matches.length === 0) {
+                    return <div className="py-4 text-center text-xs text-slate-400 italic">Không tìm thấy ý tưởng phù hợp</div>;
+                  }
+
+                  return matches.map((idea: Idea) => {
+                    const pc = pcById[idea.platformChannelId];
+                    const ch = pc ? channelGroupById[pc.channelGroupId] : null;
+                    const pl = pc ? platformById[pc.platformId] : null;
+                    const statusStyle = STATUS_COLORS[idea.status] || STATUS_COLORS.PITCH;
+
+                    return (
+                      <div
+                        key={idea.id}
+                        onClick={() => {
+                          setOpenIdea(idea);
+                          setSearchQuery("");
+                        }}
+                        className="p-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-colors cursor-pointer flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 mb-0.5 text-[10px] text-slate-500">
+                            {ch && <span className="w-1.5 h-1.5 rounded-full" style={{ background: ch.color }} />}
+                            <span className="font-semibold">{ch?.name || "Kênh"}</span>
+                            <span>· {pl?.name}</span>
+                          </div>
+                          <div className="text-xs font-semibold text-slate-900 truncate">{idea.title}</div>
+                        </div>
+                        <span 
+                          className="px-2 py-0.5 rounded-full text-[9px] font-bold shrink-0"
+                          style={{ background: statusStyle.bg, color: statusStyle.fg, border: `1px solid ${statusStyle.bd}` }}>
+                          {STATUS_LABEL[idea.status]}
+                        </span>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            )}
           </div>
 
           {/* Header Right Actions */}
@@ -915,7 +992,7 @@ export default function ClientApp({
         {/* -------------------------------------------------------------
            MAIN STAGE VIEWPORT (#F8FAFC)
         ------------------------------------------------------------- */}
-        <main className="flex-1 p-5 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-3 sm:p-5 max-w-7xl w-full mx-auto">
           {tab === "dashboard" && (
             <DashboardView 
               ideas={ideas}
@@ -1507,6 +1584,333 @@ export default function ClientApp({
         </Modal>
       )}
 
+      {/* ADD CHANNEL MODAL */}
+      {showNewChannel && (
+        <Modal title="Thêm Kênh mới (Channel Group)" onClose={() => setShowNewChannel(false)}>
+          <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
+            e.preventDefault();
+            const form = e.currentTarget;
+            const name = (form.elements.namedItem("channelName") as HTMLInputElement).value;
+            const color = (form.elements.namedItem("channelColor") as HTMLInputElement).value;
+            const selectedPlatformIds = Array.from(
+              (form.elements.namedItem("platformIds") as HTMLSelectElement).selectedOptions
+            ).map(o => o.value);
+            
+            runAction(createChannelGroupAction, name, color, selectedPlatformIds);
+            setShowNewChannel(false);
+            showToast(`Đã tạo kênh "${name}"`);
+          }}>
+            <div className="space-y-3">
+              <div>
+                <FieldLabel required>Tên Kênh</FieldLabel>
+                <TextInput id="channelName" autoFocus required placeholder="VD: YNDA Phim Ngắn, YNDA Podcast..." />
+              </div>
+
+              <div>
+                <FieldLabel>Màu đại diện</FieldLabel>
+                <div className="flex items-center gap-2">
+                  <input type="color" name="channelColor" defaultValue={CHANNEL_PALETTE[channelGroups.length % CHANNEL_PALETTE.length]} className="w-8 h-8 rounded border border-slate-200 cursor-pointer" />
+                  <span className="text-[11px] text-slate-500">Chọn màu để phân biệt kênh trên bảng Gantt và Pipeline.</span>
+                </div>
+              </div>
+
+              <div>
+                <FieldLabel>Nền tảng phát hành (giữ Ctrl để chọn nhiều)</FieldLabel>
+                <select name="platformIds" multiple className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs bg-white text-slate-700 focus:outline-none focus:border-slate-900 min-h-[80px]">
+                  {platforms.map((p: Platform) => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.defaultDurationDays} ngày)</option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-500 mt-1">Nếu không chọn, hệ thống sẽ tự gán các nền tảng mặc định.</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-slate-100">
+              <Btn onClick={() => setShowNewChannel(false)}>Huỷ</Btn>
+              <Btn tone="primary" type="submit" loading={isPending}>Tạo Kênh</Btn>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ADD PLATFORM MODAL */}
+      {showNewPlatform && (
+        <Modal title="Thêm Nền tảng phát hành mới" onClose={() => setShowNewPlatform(false)}>
+          <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
+            e.preventDefault();
+            const form = e.currentTarget;
+            const name = (form.elements.namedItem("platName") as HTMLInputElement).value;
+            const days = parseInt((form.elements.namedItem("platDays") as HTMLInputElement).value, 10);
+            
+            runAction(createPlatformAction, name, days);
+            setShowNewPlatform(false);
+            showToast(`Đã tạo nền tảng "${name}"`);
+          }}>
+            <div className="space-y-3">
+              <div>
+                <FieldLabel required>Tên Nền tảng</FieldLabel>
+                <TextInput id="platName" autoFocus required placeholder="VD: TikTok, YouTube, Facebook Reels..." />
+              </div>
+
+              <div>
+                <FieldLabel required>Thời gian sản xuất mặc định (ngày)</FieldLabel>
+                <TextInput id="platDays" type="number" min={1} max={30} defaultValue={2} required />
+                <p className="text-[11px] text-slate-500 mt-1">Số ngày mặc định để Producer hoàn thành video trên nền tảng này.</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-slate-100">
+              <Btn onClick={() => setShowNewPlatform(false)}>Huỷ</Btn>
+              <Btn tone="primary" type="submit" loading={isPending}>Tạo Nền tảng</Btn>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ADD MEMBER MODAL */}
+      {showNewMember && (
+        <Modal title="Thêm thành viên mới vào Studio" onClose={() => setShowNewMember(false)}>
+          <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
+            e.preventDefault();
+            const form = e.currentTarget;
+            const name = (form.elements.namedItem("memberName") as HTMLInputElement).value;
+            const email = (form.elements.namedItem("memberEmail") as HTMLInputElement).value;
+            const role = (form.elements.namedItem("memberRole") as HTMLSelectElement).value;
+            const password = (form.elements.namedItem("memberPassword") as HTMLInputElement).value;
+            const phone = (form.elements.namedItem("memberPhone") as HTMLInputElement).value;
+            const facebook = (form.elements.namedItem("memberFacebook") as HTMLInputElement).value;
+            const primaryExpertise = (form.elements.namedItem("memberPrimaryExpertise") as HTMLInputElement).value;
+            const secondaryExpertise = (form.elements.namedItem("memberSecondaryExpertise") as HTMLInputElement).value;
+            
+            runAction(createMemberAction, name, role, email, password || "123", phone, facebook, primaryExpertise, secondaryExpertise);
+            setShowNewMember(false);
+            showToast(`Đã thêm thành viên "${name}"`);
+          }}>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <FieldLabel required>Họ tên</FieldLabel>
+                  <TextInput id="memberName" autoFocus required placeholder="Nguyễn Văn A" />
+                </div>
+                <div>
+                  <FieldLabel required>Email đăng nhập</FieldLabel>
+                  <TextInput id="memberEmail" type="email" required placeholder="a@ynda.vn" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <FieldLabel required>Vai trò</FieldLabel>
+                  <Select id="memberRole" required>
+                    <option value="P">Producer (P)</option>
+                    <option value="Editor">Editor</option>
+                    <option value="Core">Core Team</option>
+                  </Select>
+                </div>
+                <div>
+                  <FieldLabel>Mật khẩu ban đầu</FieldLabel>
+                  <TextInput id="memberPassword" placeholder="Mặc định: 123" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <FieldLabel>Số điện thoại</FieldLabel>
+                  <TextInput id="memberPhone" placeholder="0909..." />
+                </div>
+                <div>
+                  <FieldLabel>Facebook</FieldLabel>
+                  <TextInput id="memberFacebook" placeholder="https://facebook.com/..." />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <FieldLabel>Chuyên môn chính</FieldLabel>
+                  <TextInput id="memberPrimaryExpertise" placeholder="Quay, Dựng, Kịch bản..." />
+                </div>
+                <div>
+                  <FieldLabel>Chuyên môn phụ</FieldLabel>
+                  <TextInput id="memberSecondaryExpertise" placeholder="Đồ hoạ, MC..." />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-slate-100">
+              <Btn onClick={() => setShowNewMember(false)}>Huỷ</Btn>
+              <Btn tone="primary" type="submit" loading={isPending}>Thêm thành viên</Btn>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* CONFIRM DELETE CHANNEL MODAL */}
+      {confirmDeleteChannel && (
+        <Modal title={`Xoá / Lưu trữ kênh: ${confirmDeleteChannel.name}`} onClose={() => setConfirmDeleteChannel(null)}>
+          <div className="space-y-3">
+            <div className="p-3 rounded-lg bg-rose-50 text-rose-800 text-xs border border-rose-200">
+              ⚠️ Nếu kênh còn ý tưởng gắn liền, kênh sẽ được chuyển sang trạng thái <strong>Lưu trữ</strong> thay vì xoá hoàn toàn. Bạn có thể khôi phục lại sau.
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-slate-100">
+            <Btn onClick={() => setConfirmDeleteChannel(null)}>Huỷ</Btn>
+            <Btn tone="danger" loading={isPending} onClick={() => {
+              runAction(archiveChannelGroupAction, confirmDeleteChannel.id);
+              setConfirmDeleteChannel(null);
+              showToast("Đã xoá / lưu trữ kênh");
+            }}>Xác nhận xoá</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* VIEW PROFILE MODAL */}
+      {showProfile && (
+        <Modal title={`Hồ sơ: ${showProfile.name}`} onClose={() => setShowProfile(null)}>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
+              <UserAvatar name={showProfile.name} size={40} />
+              <div>
+                <div className="font-bold text-sm text-slate-900">{showProfile.name}</div>
+                <div className="text-xs text-slate-500">{showProfile.id}</div>
+                <RoleChip role={showProfile.role} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                <span className="text-slate-500 block mb-0.5">Điện thoại</span>
+                <span className="font-semibold text-slate-900">{showProfile.phone || "—"}</span>
+              </div>
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                <span className="text-slate-500 block mb-0.5">Facebook</span>
+                {showProfile.facebook ? (
+                  <a href={showProfile.facebook} target="_blank" rel="noreferrer" className="font-semibold text-indigo-600 hover:underline">Mở Facebook</a>
+                ) : (
+                  <span className="font-semibold text-slate-900">—</span>
+                )}
+              </div>
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                <span className="text-slate-500 block mb-0.5">Chuyên môn chính</span>
+                <span className="font-semibold text-slate-900">{showProfile.primaryExpertise || "—"}</span>
+              </div>
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                <span className="text-slate-500 block mb-0.5">Chuyên môn phụ</span>
+                <span className="font-semibold text-slate-900">{showProfile.secondaryExpertise || "—"}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-slate-100">
+            {(actor.role === "Core" || actor.id === showProfile.id) && (
+              <Btn tone="primary" onClick={() => { setEditProfile(showProfile); setShowProfile(null); }}>Chỉnh sửa hồ sơ</Btn>
+            )}
+            <Btn onClick={() => setShowProfile(null)}>Đóng</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* EDIT PROFILE MODAL */}
+      {editProfile && (
+        <Modal title={`Chỉnh sửa hồ sơ: ${editProfile.name}`} onClose={() => setEditProfile(null)}>
+          <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
+            e.preventDefault();
+            const form = e.currentTarget;
+            const name = (form.elements.namedItem("editName") as HTMLInputElement).value;
+            const phone = (form.elements.namedItem("editPhone") as HTMLInputElement).value;
+            const facebook = (form.elements.namedItem("editFacebook") as HTMLInputElement).value;
+            const primaryExpertise = (form.elements.namedItem("editPrimaryExpertise") as HTMLInputElement).value;
+            const secondaryExpertise = (form.elements.namedItem("editSecondaryExpertise") as HTMLInputElement).value;
+            const role = actor.role === "Core" ? (form.elements.namedItem("editRole") as HTMLSelectElement)?.value : undefined;
+            const password = actor.role === "Core" ? (form.elements.namedItem("editPassword") as HTMLInputElement)?.value : undefined;
+
+            runAction(updateMemberProfileAction, editProfile.id, name, phone, facebook, primaryExpertise, secondaryExpertise, role, password);
+            setEditProfile(null);
+            showToast("Đã cập nhật hồ sơ thành viên");
+          }}>
+            <div className="space-y-3">
+              <div>
+                <FieldLabel required>Họ tên</FieldLabel>
+                <TextInput id="editName" required defaultValue={editProfile.name} autoFocus />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <FieldLabel>Điện thoại</FieldLabel>
+                  <TextInput id="editPhone" defaultValue={editProfile.phone || ""} />
+                </div>
+                <div>
+                  <FieldLabel>Facebook</FieldLabel>
+                  <TextInput id="editFacebook" defaultValue={editProfile.facebook || ""} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <FieldLabel>Chuyên môn chính</FieldLabel>
+                  <TextInput id="editPrimaryExpertise" defaultValue={editProfile.primaryExpertise || ""} />
+                </div>
+                <div>
+                  <FieldLabel>Chuyên môn phụ</FieldLabel>
+                  <TextInput id="editSecondaryExpertise" defaultValue={editProfile.secondaryExpertise || ""} />
+                </div>
+              </div>
+              {actor.role === "Core" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <FieldLabel>Vai trò</FieldLabel>
+                    <Select id="editRole" defaultValue={editProfile.role}>
+                      <option value="P">Producer (P)</option>
+                      <option value="Editor">Editor</option>
+                      <option value="Core">Core Team</option>
+                    </Select>
+                  </div>
+                  <div>
+                    <FieldLabel>Đặt mật khẩu mới</FieldLabel>
+                    <TextInput id="editPassword" placeholder="Để trống nếu không đổi" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-slate-100">
+              <Btn onClick={() => setEditProfile(null)}>Huỷ</Btn>
+              <Btn tone="primary" type="submit" loading={isPending}>Lưu thay đổi</Btn>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* EDIT IDEA DETAILS MODAL */}
+      {editIdeaTarget && (
+        <Modal title={`Sửa chi tiết ý tưởng: ${editIdeaTarget.title}`} onClose={() => setEditIdeaTarget(null)}>
+          <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
+            e.preventDefault();
+            const form = e.currentTarget;
+            const title = (form.elements.namedItem("editIdeaTitle") as HTMLInputElement).value;
+            const description = (form.elements.namedItem("editIdeaDescription") as HTMLTextAreaElement).value;
+
+            runAction(updateIdeaDetailsAction, editIdeaTarget.id, title, description);
+            setEditIdeaTarget(null);
+            showToast("Đã cập nhật chi tiết ý tưởng");
+          }}>
+            <div className="space-y-3">
+              <div>
+                <FieldLabel required>Tiêu đề ý tưởng</FieldLabel>
+                <TextInput id="editIdeaTitle" required defaultValue={editIdeaTarget.title} autoFocus />
+              </div>
+              <div>
+                <FieldLabel>Mô tả chi tiết</FieldLabel>
+                <TextArea id="editIdeaDescription" rows={4} defaultValue={editIdeaTarget.description || ""} />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-slate-100">
+              <Btn onClick={() => setEditIdeaTarget(null)}>Huỷ</Btn>
+              <Btn tone="primary" type="submit" loading={isPending}>Lưu thay đổi</Btn>
+            </div>
+          </form>
+        </Modal>
+      )}
+
       {/* TOAST NOTIFICATION */}
       {toast && (
         <div className="fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-lg bg-slate-900 text-white text-xs font-medium saas-shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3 duration-200">
@@ -1891,12 +2295,45 @@ function IdeaSlideOverDrawer({
   const od = overdueInfo(idea);
   const statusStyle = STATUS_COLORS[idea.status] || STATUS_COLORS.PITCH;
 
+  const [internalNote, setInternalNote] = useState(idea.internalNote || "");
+  useEffect(() => {
+    setInternalNote(idea.internalNote || "");
+  }, [idea.id, idea.internalNote]);
+
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!commentInput.trim()) return;
     runAction(addCommentAction, idea.id, commentInput.trim());
     setCommentInput("");
     showToast("Đã gửi bình luận");
+  };
+
+  const handleSaveNote = () => {
+    runAction(updateIdeaNoteAction, idea.id, internalNote);
+    showToast("Đã lưu ghi chú nội bộ");
+  };
+
+  const handleRate = (star: number) => {
+    runAction(rateIdeaAction, idea.id, star);
+    showToast(`Đã đánh giá ${star} sao cho sản phẩm`);
+  };
+
+  const handleClone = () => {
+    runAction(cloneIdeaAction, idea.id);
+    showToast("Đã nhân bản ý tưởng mới");
+  };
+
+  const handleRestore = () => {
+    runAction(restoreArchivedIdeaAction, idea.id);
+    showToast("Đã khôi phục ý tưởng về trạng thái ban đầu");
+  };
+
+  const handleDeletePermanent = () => {
+    if (window.confirm(`Bạn có chắc chắn muốn xoá vĩnh viễn ý tưởng "${idea.title}"? Hành động này không thể hoàn tác.`)) {
+      runAction(deleteIdeaAction, idea.id);
+      onClose();
+      showToast("Đã xoá vĩnh viễn ý tưởng");
+    }
   };
 
   return (
@@ -1986,7 +2423,17 @@ function IdeaSlideOverDrawer({
             </Btn>
           )}
 
-          {actor.role === "Core" && idea.status !== "COMPLETE" && (
+          {/* CLONE IDEA BUTTON */}
+          <Btn small tone="default" onClick={handleClone} title="Tạo bản sao từ ý tưởng này">
+            <Copy size={12} /> Nhân bản
+          </Btn>
+
+          {/* EDIT IDEA */}
+          <Btn small tone="default" onClick={onEditIdea} title="Chỉnh sửa tên & mô tả">
+            Sửa
+          </Btn>
+
+          {actor.role === "Core" && idea.status !== "COMPLETE" && idea.status !== "ARCHIVED_IDEA" && idea.status !== "CANCELLED" && (
             <Btn small tone="default" onClick={onReassign}>
               Đổi người
             </Btn>
@@ -1998,9 +2445,23 @@ function IdeaSlideOverDrawer({
             </Btn>
           )}
 
+          {/* RESTORE IF ARCHIVED OR CANCELLED */}
+          {(idea.status === "ARCHIVED_IDEA" || idea.status === "CANCELLED") && (
+            <Btn small tone="success" onClick={handleRestore}>
+              <RotateCcw size={12} /> Khôi phục
+            </Btn>
+          )}
+
+          {/* PERMANENT DELETE (CORE ONLY FOR ARCHIVED/CANCELLED) */}
+          {actor.role === "Core" && (idea.status === "ARCHIVED_IDEA" || idea.status === "CANCELLED") && (
+            <Btn small tone="danger" onClick={handleDeletePermanent}>
+              <Trash2 size={12} /> Xoá hẳn
+            </Btn>
+          )}
+
           <div className="flex-1" />
 
-          {idea.status !== "COMPLETE" && (actor.role === "Core" || (idea.status === "PITCH" && idea.submittedByEmail === actor.id)) && (
+          {idea.status !== "COMPLETE" && idea.status !== "ARCHIVED_IDEA" && idea.status !== "CANCELLED" && (actor.role === "Core" || (idea.status === "PITCH" && idea.submittedByEmail === actor.id)) && (
             <Btn small tone="ghost" onClick={onCancel}>
               Huỷ
             </Btn>
@@ -2062,6 +2523,57 @@ function IdeaSlideOverDrawer({
             )}
           </div>
 
+          {/* STAR RATING FOR COMPLETED VIDEO */}
+          {idea.status === "COMPLETE" && (
+            <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Star size={13} className="text-amber-500 fill-amber-500" />
+                  Đánh giá chất lượng sản phẩm
+                </div>
+                {idea.rating && (
+                  <span className="text-xs font-bold text-amber-800">{idea.rating} / 5 ⭐</span>
+                )}
+              </div>
+
+              {actor.role === "Core" ? (
+                <div className="flex items-center gap-1 pt-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => handleRate(star)}
+                      className="p-1 hover:scale-110 transition-transform">
+                      <Star
+                        size={20}
+                        className={
+                          (Number(idea.rating) || 0) >= star
+                            ? "text-amber-500 fill-amber-400"
+                            : "text-slate-300 hover:text-amber-300"
+                        }
+                      />
+                    </button>
+                  ))}
+                  <span className="text-[11px] text-amber-700 ml-2">Click để chấm điểm Core</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 pt-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      size={18}
+                      className={
+                        (Number(idea.rating) || 0) >= star
+                          ? "text-amber-500 fill-amber-400"
+                          : "text-slate-200"
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* DESCRIPTION */}
           {idea.description && (
             <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 leading-relaxed">
@@ -2071,6 +2583,38 @@ function IdeaSlideOverDrawer({
               <p className="text-slate-700 whitespace-pre-line">{idea.description}</p>
             </div>
           )}
+
+          {/* INTERNAL NOTES (FOR STUDIO / CORE) */}
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                <Lock size={12} className="text-slate-500" />
+                Ghi chú nội bộ Studio
+              </div>
+              {actor.role === "Core" && (
+                <span className="text-[10px] text-slate-400 font-medium">Chỉ Core chỉnh sửa</span>
+              )}
+            </div>
+
+            {actor.role === "Core" ? (
+              <div className="space-y-2">
+                <TextArea
+                  rows={2}
+                  value={internalNote}
+                  onChange={(e: any) => setInternalNote(e.target.value)}
+                  placeholder="Ghi chú riêng của Core (VD: Cần lưu ý bản quyền nhạc, clip này chạy tài trợ...)"
+                  className="text-xs"
+                />
+                <div className="flex justify-end">
+                  <Btn small onClick={handleSaveNote}>Lưu ghi chú</Btn>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-600 italic whitespace-pre-line">
+                {idea.internalNote || "Chưa có ghi chú nội bộ."}
+              </p>
+            )}
+          </div>
 
           {/* TIMELINE MILESTONES */}
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
@@ -2430,6 +2974,11 @@ function ChannelGanttView({
           <div className="flex items-center gap-2">
             <Btn small onClick={onNewChannel}><Plus size={12} /> Thêm Kênh</Btn>
             <Btn small onClick={onNewPlatform}><Plus size={12} /> Thêm Nền tảng</Btn>
+            {currentChannel && (
+              <Btn small tone="danger" onClick={() => onDeleteChannel(currentChannel)}>
+                <Trash2 size={12} /> Xoá kênh
+              </Btn>
+            )}
           </div>
         )}
       </div>
@@ -2502,6 +3051,31 @@ function ChannelGanttView({
           </table>
         </div>
       </div>
+
+      {/* TRASHED / ARCHIVED CHANNELS SECTION */}
+      {trashedChannelGroups && trashedChannelGroups.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white saas-shadow p-4">
+          <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <FolderOpen size={14} className="text-slate-400" />
+            Kênh đã lưu trữ ({trashedChannelGroups.length})
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+            {trashedChannelGroups.map((c: any) => (
+              <div key={c.id} className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: c.color }} />
+                  <span className="text-xs font-semibold text-slate-700 truncate">{c.name}</span>
+                </div>
+                {actor.role === "Core" && (
+                  <Btn small tone="success" onClick={() => onRestoreChannel(c)}>
+                    <RotateCcw size={11} /> Khôi phục
+                  </Btn>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2716,23 +3290,217 @@ function MembersAndAuditView({
   onToggleActive,
   runAction
 }: any) {
+  const [showImportPanel, setShowImportPanel] = useState(false);
+  const [importData, setImportData] = useState<any[]>([]);
+  const [importError, setImportError] = useState("");
+  const [importResult, setImportResult] = useState<{imported:number;skipped:number;errors:string[]}|null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // EXPORT CSV
+  const handleExportCSV = () => {
+    const header = "Họ tên,Email,Vai trò,Mật khẩu,SĐT,Facebook,Chuyên môn chính,Chuyên môn phụ";
+    const csvRows = members.map((m: Member) =>
+      [m.name, m.id, m.role, "", m.phone || "", m.facebook || "", m.primaryExpertise || "", m.secondaryExpertise || ""].map(v => `"${(v || '').replace(/"/g, '""')}"`).join(",")
+    );
+    const csv = "\uFEFF" + header + "\n" + csvRows.join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ynda_members_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // DOWNLOAD TEMPLATE
+  const handleDownloadTemplate = () => {
+    const header = "Họ tên,Email,Vai trò,Mật khẩu,SĐT,Facebook,Chuyên môn chính,Chuyên môn phụ";
+    const example1 = '"Nguyễn Văn A","a@ynda.vn","P","123","0909000111","","Quay phim","Dựng phim"';
+    const example2 = '"Trần Thị B","b@ynda.vn","Editor","123","","","Biên tập",""';
+    const example3 = '"Lê Văn C","c@ynda.vn","Core","admin123","0909000333","https://facebook.com/levanc","Quản lý","Kịch bản"';
+    const csv = "\uFEFF" + [header, example1, example2, example3].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "mau_import_thanh_vien.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // PARSE CSV FILE
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportError("");
+    setImportResult(null);
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const text = evt.target?.result as string;
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        if (lines.length < 2) {
+          setImportError("File phải có ít nhất 1 dòng header và 1 dòng dữ liệu.");
+          return;
+        }
+
+        // Parse CSV (handle quoted fields)
+        const parseLine = (line: string): string[] => {
+          const result: string[] = [];
+          let current = '';
+          let inQuotes = false;
+          for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (inQuotes) {
+              if (ch === '"') {
+                if (i + 1 < line.length && line[i + 1] === '"') { current += '"'; i++; }
+                else { inQuotes = false; }
+              } else { current += ch; }
+            } else {
+              if (ch === '"') { inQuotes = true; }
+              else if (ch === ',') { result.push(current.trim()); current = ''; }
+              else { current += ch; }
+            }
+          }
+          result.push(current.trim());
+          return result;
+        };
+
+        // Skip header row
+        const dataRows = lines.slice(1).map(parseLine);
+        const parsed = dataRows.map(cols => ({
+          name: cols[0] || '',
+          email: cols[1] || '',
+          role: cols[2] || 'P',
+          password: cols[3] || '123',
+          phone: cols[4] || '',
+          facebook: cols[5] || '',
+          primaryExpertise: cols[6] || '',
+          secondaryExpertise: cols[7] || ''
+        })).filter(r => r.name && r.email);
+
+        if (parsed.length === 0) {
+          setImportError("Không tìm thấy dữ liệu hợp lệ trong file. Đảm bảo cột Họ tên và Email không trống.");
+          return;
+        }
+
+        setImportData(parsed);
+        setShowImportPanel(true);
+      } catch (err: any) {
+        setImportError("Lỗi đọc file: " + (err.message || "Không xác định"));
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+    // Reset file input so same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // SUBMIT IMPORT
+  const handleImportSubmit = async () => {
+    try {
+      const res = await bulkImportMembersAction(importData);
+      setImportResult(res);
+      setImportData([]);
+      // Trigger refresh
+      runAction(async () => {});
+    } catch (err: any) {
+      setImportError(err.message || "Lỗi import");
+    }
+  };
+
   return (
     <div className="space-y-5">
       {/* TEAM DIRECTORY */}
       <div className="rounded-xl border border-slate-200 bg-white saas-shadow p-4">
-        <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 pb-2 border-b border-slate-100 gap-2">
           <div>
             <h3 className="font-bold text-sm text-slate-900">Đội Ngũ Nhân Sự Studio ({members.length})</h3>
             <p className="text-xs text-slate-500">Danh sách các thành viên Core, Editor và Producer trong hệ thống.</p>
           </div>
           {actor.role === "Core" && (
-            <Btn small tone="primary" onClick={onAddMember}><Plus size={12} /> Thêm Thành Viên</Btn>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Btn small tone="primary" onClick={onAddMember}><Plus size={12} /> Thêm</Btn>
+              <Btn small onClick={() => fileInputRef.current?.click()}><Upload size={12} /> Import CSV</Btn>
+              <Btn small onClick={handleExportCSV}><Download size={12} /> Xuất CSV</Btn>
+              <Btn small onClick={handleDownloadTemplate}><Download size={12} /> Tải mẫu</Btn>
+              <input ref={fileInputRef} type="file" accept=".csv,.txt" className="hidden" onChange={handleFileUpload} />
+            </div>
           )}
         </div>
 
+        {/* IMPORT ERROR */}
+        {importError && (
+          <div className="mb-3 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between">
+            <span>⚠️ {importError}</span>
+            <button onClick={() => setImportError("")} className="text-rose-600 hover:text-rose-900"><X size={14} /></button>
+          </div>
+        )}
+
+        {/* IMPORT SUCCESS RESULT */}
+        {importResult && (
+          <div className="mb-3 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs">
+            <div className="font-bold mb-1">✅ Kết quả Import:</div>
+            <div>• Đã thêm thành công: <strong>{importResult.imported}</strong> thành viên</div>
+            <div>• Bỏ qua (trùng hoặc thiếu dữ liệu): <strong>{importResult.skipped}</strong></div>
+            {importResult.errors.length > 0 && (
+              <div className="mt-1 text-amber-700">
+                • Chi tiết bỏ qua: {importResult.errors.join(", ")}
+              </div>
+            )}
+            <button onClick={() => setImportResult(null)} className="mt-1.5 text-emerald-700 hover:underline font-semibold">Đóng</button>
+          </div>
+        )}
+
+        {/* IMPORT PREVIEW TABLE */}
+        {showImportPanel && importData.length > 0 && (
+          <div className="mb-4 p-3.5 rounded-xl bg-amber-50 border border-amber-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-amber-900">📋 Xem trước dữ liệu Import ({importData.length} thành viên)</span>
+              <div className="flex items-center gap-1.5">
+                <Btn small tone="primary" onClick={handleImportSubmit}>✓ Xác nhận Import</Btn>
+                <Btn small onClick={() => { setShowImportPanel(false); setImportData([]); }}>Huỷ</Btn>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-amber-300 text-[10px] font-bold text-amber-800">
+                    <th className="py-1.5 pr-2">#</th>
+                    <th className="py-1.5 pr-2">Họ tên</th>
+                    <th className="py-1.5 pr-2">Email</th>
+                    <th className="py-1.5 pr-2">Vai trò</th>
+                    <th className="py-1.5 pr-2">SĐT</th>
+                    <th className="py-1.5 pr-2">Chuyên môn</th>
+                    <th className="py-1.5"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-amber-200">
+                  {importData.map((r: any, idx: number) => (
+                    <tr key={idx} className="text-amber-900">
+                      <td className="py-1.5 pr-2 text-amber-600 font-mono">{idx + 1}</td>
+                      <td className="py-1.5 pr-2 font-semibold">{r.name}</td>
+                      <td className="py-1.5 pr-2 font-mono">{r.email}</td>
+                      <td className="py-1.5 pr-2"><RoleChip role={r.role} /></td>
+                      <td className="py-1.5 pr-2">{r.phone || "—"}</td>
+                      <td className="py-1.5 pr-2">{r.primaryExpertise || "—"}</td>
+                      <td className="py-1.5">
+                        <button onClick={() => setImportData(prev => prev.filter((_: any, i: number) => i !== idx))} className="text-rose-500 hover:text-rose-700"><X size={13} /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {members.map((m: Member) => (
-            <div key={m.id} className="p-3 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-between gap-2">
+            <div 
+              key={m.id} 
+              onClick={() => onShowProfile(m)}
+              className="p-3 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-between gap-2 hover:bg-slate-100 hover:border-slate-300 transition-colors cursor-pointer">
               <div className="flex items-center gap-2 min-w-0">
                 <UserAvatar name={m.name} size={28} />
                 <div className="min-w-0">
@@ -2740,9 +3508,109 @@ function MembersAndAuditView({
                   <div className="text-[10px] text-slate-500 truncate">{m.id}</div>
                 </div>
               </div>
-              <RoleChip role={m.role} />
+              <div className="flex items-center gap-1.5 shrink-0">
+                <RoleChip role={m.role} />
+                {!m.active && (
+                  <span className="text-[9px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">Ngừng HĐ</span>
+                )}
+              </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* FORMAT INFO CARD */}
+      {actor.role === "Core" && (
+        <div className="rounded-xl border border-slate-200 bg-white saas-shadow p-4">
+          <h3 className="font-bold text-xs text-slate-900 mb-2 flex items-center gap-1.5">
+            <FileText size={14} className="text-slate-600" />
+            Hướng dẫn định dạng file Import CSV
+          </h3>
+          <div className="bg-slate-50 rounded-lg border border-slate-200 p-3 text-xs text-slate-700 font-mono overflow-x-auto">
+            <div className="text-slate-500 mb-1">// Dòng 1 (Header):</div>
+            <div>Họ tên,Email,Vai trò,Mật khẩu,SĐT,Facebook,Chuyên môn chính,Chuyên môn phụ</div>
+            <div className="text-slate-500 mt-2 mb-1">// Ví dụ dòng dữ liệu:</div>
+            <div>"Nguyễn Văn A","a@ynda.vn","P","123","0909000111","","Quay phim","Dựng phim"</div>
+          </div>
+          <p className="text-[11px] text-slate-500 mt-2">
+            <strong>Vai trò:</strong> Core, Editor (hoặc E), Producer (hoặc P). Mật khẩu mặc định là "123" nếu để trống.
+            File phải mã hóa <strong>UTF-8</strong> để hỗ trợ tiếng Việt.
+          </p>
+        </div>
+      )}
+
+      {/* CHECKLISTS & TO-DO STUDIO */}
+      <div className="rounded-xl border border-slate-200 bg-white saas-shadow p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+          <div>
+            <h3 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+              <CheckSquare size={16} className="text-indigo-600" />
+              Checklist & Việc Cần Làm Studio ({checklists.length})
+            </h3>
+            <p className="text-xs text-slate-500">To-do list nội bộ để điều phối các đầu việc chung trong studio.</p>
+          </div>
+        </div>
+
+        {/* ADD CHECKLIST FORM */}
+        <form 
+          onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
+            e.preventDefault();
+            const form = e.currentTarget;
+            const titleInput = form.elements.namedItem("checklistTitle") as HTMLInputElement;
+            const val = titleInput.value.trim();
+            if (!val) return;
+            runAction(createChecklistAction, val);
+            titleInput.value = "";
+          }}
+          className="flex items-center gap-2">
+          <input
+            name="checklistTitle"
+            type="text"
+            placeholder="Nhập đầu việc mới (VD: Kiểm tra pin máy quay, Mua bản quyền nhạc tháng 9...)"
+            required
+            className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:border-slate-900 focus:outline-none"
+          />
+          <Btn tone="primary" small type="submit"><Plus size={12} /> Thêm việc</Btn>
+        </form>
+
+        {/* CHECKLIST LIST */}
+        <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1 divide-y divide-slate-100">
+          {checklists.length === 0 ? (
+            <div className="py-6 text-center text-xs text-slate-400 italic">
+              Chưa có checklist nào. Hãy thêm đầu việc đầu tiên!
+            </div>
+          ) : (
+            checklists.map((item: ChecklistItem) => {
+              const isDone = item.status === "Hoàn thành";
+              return (
+                <div key={item.id} className="pt-2 flex items-center justify-between gap-3 text-xs">
+                  <label className="flex items-center gap-2.5 min-w-0 cursor-pointer select-none flex-1">
+                    <input
+                      type="checkbox"
+                      checked={isDone}
+                      onChange={() => runAction(updateChecklistStatusAction, item.id, isDone ? "Chưa bắt đầu" : "Hoàn thành")}
+                      className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                    <span className={`truncate ${isDone ? 'line-through text-slate-400 font-normal' : 'text-slate-800 font-medium'}`}>
+                      {item.name}
+                    </span>
+                  </label>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${isDone ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
+                      {item.status || "Chưa bắt đầu"}
+                    </span>
+                    <button
+                      onClick={() => runAction(deleteChecklistAction, item.id)}
+                      className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                      title="Xoá đầu việc">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
