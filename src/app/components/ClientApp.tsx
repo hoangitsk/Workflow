@@ -65,6 +65,15 @@ const C = {
 
 const CHANNEL_PALETTE = ["#2563EB", "#7C3AED", "#DB2777", "#D97706", "#059669", "#0891B2"];
 
+export const CONTENT_PILLARS = [
+  { value: "Branding", label: "1. Branding — Làm sáng thương hiệu", desc: "Ý niệm điện ảnh là thương hiệu gì? Core là gì? Branding thuần cho kênh -> Khẳng định giá trị." },
+  { value: "Trải nghiệm", label: "2. Trải nghiệm — Feedback & Tương tác", desc: "Feedback, trải nghiệm, tương tác giữa người xem và nhà sáng tạo. Phản hồi ý kiến người xem." },
+  { value: "News", label: "3. News — Tin tức & Đu trend hot", desc: "Cập nhật tin tức chung của ngành, thông tin, luật pháp, nội dung mới & hot." },
+  { value: "PR", label: "4. PR — Niềm tin & Kiến thức điện ảnh", desc: "Tạo mối quan hệ, niềm tin của người xem với ngành điện ảnh." },
+  { value: "Personal Branding", label: "5. Personal Branding — Chuyên môn & Nhân vật", desc: "Chuyên môn -> Xây dựng nhân vật (tính cách, chuỗi phân tích hành vi)." },
+  { value: "Content Đối tác", label: "6. Content cho đối tác — Hợp tác & Tài trợ", desc: "Nội dung hợp tác & tài trợ thương mại với các thương hiệu đối tác." }
+];
+
 const STATUS_ORDER = ["PITCH", "ASSIGNMENT", "SCRIPT", "PRODUCTION", "QA", "COMPLETE"] as const;
 const STATUS_LABEL: Record<string, string> = {
   PITCH: "Chờ duyệt Pitch",
@@ -1220,6 +1229,7 @@ export default function ClientApp({
             const referenceLinks = (form.elements.namedItem("referenceLinks") as HTMLInputElement)?.value || "";
             const angle = (form.elements.namedItem("angle") as HTMLInputElement)?.value || "";
             const keyMessage = (form.elements.namedItem("keyMessage") as HTMLInputElement)?.value || "";
+            const contentPillar = (form.elements.namedItem("contentPillar") as HTMLSelectElement)?.value || "";
             const platformChannelId = (form.elements.namedItem("platformChannel") as HTMLSelectElement).value;
 
             if (!description.trim()) {
@@ -1227,7 +1237,7 @@ export default function ClientApp({
               return;
             }
 
-            runAction(submitIdeaAction, title, description, platformChannelId, logline, referenceLinks, angle, keyMessage);
+            runAction(submitIdeaAction, title, description, platformChannelId, logline, referenceLinks, angle, keyMessage, contentPillar);
             setShowNewIdea(false);
             showToast(`Đã nộp ý tưởng "${title}"`);
           }}>
@@ -1288,6 +1298,16 @@ export default function ClientApp({
               <div>
                 <FieldLabel>Key message</FieldLabel>
                 <TextInput id="keyMessage" placeholder="Thông điệp chính muốn truyền tải..." />
+              </div>
+
+              <div>
+                <FieldLabel>Tuyến bài nội dung (Content Pillar)</FieldLabel>
+                <Select id="contentPillar">
+                  <option value="">-- Chọn tuyến bài nội dung --</option>
+                  {CONTENT_PILLARS.map(p => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </Select>
               </div>
 
               <div>
@@ -1910,13 +1930,15 @@ export default function ClientApp({
           }}>
             <div className="space-y-3">
               <div>
-                <FieldLabel required>Giai đoạn & Định hướng đợt này</FieldLabel>
+                <FieldLabel required>Tuyến bài & Giai đoạn định hướng đợt này</FieldLabel>
                 <Select id="batchCategory" required>
-                  <option value="Branding & Xây dựng Nhân vật">🎯 Branding & Xây dựng Nhân vật (Personal Branding, Phân tích tính cách...)</option>
-                  <option value="News & Đu Trend Xã hội">⚡ News & Đu Trend Xã hội (Tin hot, Sự kiện xã hội -> Đào phim/chủ đề)</option>
-                  <option value="Series Chuyên môn">📚 Series Chuyên môn & Kiến thức chuyên sâu</option>
-                  <option value="Review & Phân tích tác phẩm">🎬 Review & Phân tích Tác phẩm (Phim, Podcast, Drama)</option>
-                  <option value="Khác">💡 Định hướng khác</option>
+                  <option value="5. Personal Branding (Chuyên môn & Nhân vật)">5. Personal Branding — Chuyên môn -> Xây dựng nhân vật (tính cách, phân tích hành vi)</option>
+                  <option value="1. Branding (Làm sáng thương hiệu)">1. Branding — Làm sáng thương hiệu (Khẳng định giá trị core của Ý niệm điện ảnh)</option>
+                  <option value="3. News (Tin tức ngành & Hot trend)">3. News — Cập nhật tin tức ngành, luật pháp, nội dung hot (Đào phim phân tích)</option>
+                  <option value="4. PR (Niềm tin & Kiến thức ngành)">4. PR — Niềm tin người xem với ngành (Cung cấp thông tin điện ảnh)</option>
+                  <option value="2. Trải nghiệm (Feedback & Tương tác)">2. Trải nghiệm — Feedback, tương tác & phản hồi ý kiến người xem</option>
+                  <option value="6. Content cho đối tác">6. Content cho đối tác (Nội dung hợp tác & tài trợ)</option>
+                  <option value="Tổng hợp / Nhiều tuyến bài">Tổng hợp / Nhiều tuyến bài</option>
                 </Select>
               </div>
 
@@ -2186,8 +2208,9 @@ export default function ClientApp({
             const referenceLinks = (form.elements.namedItem("editReferenceLinks") as HTMLInputElement)?.value || "";
             const angle = (form.elements.namedItem("editAngle") as HTMLInputElement)?.value || "";
             const keyMessage = (form.elements.namedItem("editKeyMessage") as HTMLInputElement)?.value || "";
+            const contentPillar = (form.elements.namedItem("editContentPillar") as HTMLSelectElement)?.value || "";
 
-            runAction(updateIdeaDetailsAction, editIdeaTarget.id, title, description, platformChannelId, tags, internalNote, logline, referenceLinks, angle, keyMessage);
+            runAction(updateIdeaDetailsAction, editIdeaTarget.id, title, description, platformChannelId, tags, internalNote, logline, referenceLinks, angle, keyMessage, contentPillar);
             setEditIdeaTarget(null);
             showToast("Đã cập nhật chi tiết ý tưởng");
           }}>
@@ -2215,6 +2238,15 @@ export default function ClientApp({
               <div>
                 <FieldLabel>Key message</FieldLabel>
                 <TextInput id="editKeyMessage" defaultValue={editIdeaTarget.keyMessage || ""} />
+              </div>
+              <div>
+                <FieldLabel>Tuyến bài nội dung (Content Pillar)</FieldLabel>
+                <Select id="editContentPillar" defaultValue={editIdeaTarget.contentPillar || ""}>
+                  <option value="">-- Chọn tuyến bài nội dung --</option>
+                  {CONTENT_PILLARS.map(p => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </Select>
               </div>
               <div>
                 <FieldLabel>Kênh & Nền tảng</FieldLabel>
@@ -2525,8 +2557,13 @@ function DashboardView({
                           </div>
                         ) : null}
 
-                        {(idea.angle || idea.keyMessage || idea.referenceLinks) && (
+                        {(idea.contentPillar || idea.angle || idea.keyMessage || idea.referenceLinks) && (
                           <div className="flex flex-wrap items-center gap-1 mt-1">
+                            {idea.contentPillar && (
+                              <span className="text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200/60 font-semibold truncate max-w-[180px]">
+                                🎯 {idea.contentPillar}
+                              </span>
+                            )}
                             {idea.angle && (
                               <span className="text-[10px] text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100 font-medium truncate max-w-[180px]">
                                 <span className="font-bold">Angle:</span> {idea.angle}
@@ -2992,6 +3029,17 @@ function IdeaSlideOverDrawer({
 
           {/* PITCHING DETAILS */}
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 leading-relaxed space-y-3">
+            {idea.contentPillar && (
+              <div>
+                <span className="font-bold text-slate-900 block mb-0.5 text-[11px] uppercase tracking-wider">
+                  Tuyến bài nội dung (Content Pillar):
+                </span>
+                <span className="inline-block px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200 text-xs">
+                  🎯 {idea.contentPillar}
+                </span>
+              </div>
+            )}
+
             {idea.logline && (
               <div>
                 <span className="font-bold text-slate-900 block mb-0.5 text-[11px] uppercase tracking-wider">

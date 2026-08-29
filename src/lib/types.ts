@@ -84,6 +84,7 @@ export interface Idea {
   rating?: number;
   tags?: string;
   pitchingBatchId?: string;
+  contentPillar?: string;
 }
 
 export interface PitchingBatch {

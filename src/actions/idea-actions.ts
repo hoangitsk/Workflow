@@ -29,7 +29,8 @@ export async function submitIdeaAction(
   logline?: string,
   referenceLinks?: string,
   angle?: string,
-  keyMessage?: string
+  keyMessage?: string,
+  contentPillar?: string
 ) {
   const member = await getCurrentMember();
   if (!member) throw new Error("Chưa đăng nhập");
@@ -54,8 +55,8 @@ export async function submitIdeaAction(
     `INSERT INTO ideas (
       id, title, description, platform_channel_id, submitted_by_email,
       status, created_at, credits_idea_by_email, last_pitch_week,
-      logline, reference_links, angle, key_message
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+      logline, reference_links, angle, key_message, content_pillar
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
     [
       ideaId,
       title.trim(),
@@ -69,7 +70,8 @@ export async function submitIdeaAction(
       logline?.trim() || null,
       referenceLinks?.trim() || null,
       angle?.trim() || null,
-      keyMessage?.trim() || null
+      keyMessage?.trim() || null,
+      contentPillar?.trim() || null
     ]
   );
 
@@ -393,7 +395,8 @@ export async function updateIdeaDetailsAction(
   logline: string = "",
   referenceLinks: string = "",
   angle: string = "",
-  keyMessage: string = ""
+  keyMessage: string = "",
+  contentPillar: string = ""
 ) {
   const member = await getCurrentMember();
   if (!member) throw new Error("Chưa đăng nhập");
@@ -407,13 +410,13 @@ export async function updateIdeaDetailsAction(
   const sql = getDb();
   if (member.role === "Core") {
     await sql.query(
-      `UPDATE ideas SET title = $1, description = $2, platform_channel_id = $3, tags = $4, internal_note = $5, logline = $6, reference_links = $7, angle = $8, key_message = $9 WHERE id = $10`,
-      [title.trim(), description.trim(), platformChannelId.trim(), tags.trim(), internalNote.trim(), logline.trim(), referenceLinks.trim(), angle.trim(), keyMessage.trim(), ideaId]
+      `UPDATE ideas SET title = $1, description = $2, platform_channel_id = $3, tags = $4, internal_note = $5, logline = $6, reference_links = $7, angle = $8, key_message = $9, content_pillar = $10 WHERE id = $11`,
+      [title.trim(), description.trim(), platformChannelId.trim(), tags.trim(), internalNote.trim(), logline.trim(), referenceLinks.trim(), angle.trim(), keyMessage.trim(), contentPillar.trim(), ideaId]
     );
   } else {
     await sql.query(
-      `UPDATE ideas SET title = $1, description = $2, platform_channel_id = $3, tags = $4, logline = $5, reference_links = $6, angle = $7, key_message = $8 WHERE id = $9`,
-      [title.trim(), description.trim(), platformChannelId.trim(), tags.trim(), logline.trim(), referenceLinks.trim(), angle.trim(), keyMessage.trim(), ideaId]
+      `UPDATE ideas SET title = $1, description = $2, platform_channel_id = $3, tags = $4, logline = $5, reference_links = $6, angle = $7, key_message = $8, content_pillar = $9 WHERE id = $10`,
+      [title.trim(), description.trim(), platformChannelId.trim(), tags.trim(), logline.trim(), referenceLinks.trim(), angle.trim(), keyMessage.trim(), contentPillar.trim(), ideaId]
     );
   }
 

@@ -187,6 +187,9 @@ async function initSchema() {
   try {
     await sql.query(`ALTER TABLE ideas ADD COLUMN pitching_batch_id TEXT;`);
   } catch (e) { /* ignores if exists */ }
+  try {
+    await sql.query(`ALTER TABLE ideas ADD COLUMN content_pillar TEXT;`);
+  } catch (e) { /* ignores if exists */ }
 
   try {
     await sql.query(`ALTER TABLE channel_groups ADD COLUMN description TEXT;`);

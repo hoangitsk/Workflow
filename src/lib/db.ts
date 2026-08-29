@@ -127,7 +127,8 @@ export async function getAllData(): Promise<{
     internalNote: r.internal_note || '',
     rating: r.rating !== null && r.rating !== undefined ? parseFloat(r.rating) : undefined,
     tags: r.tags || '',
-    pitchingBatchId: r.pitching_batch_id || ''
+    pitchingBatchId: r.pitching_batch_id || '',
+    contentPillar: r.content_pillar || ''
   }));
 
   const comments: CommentItem[] = commentsRows.map((r: any) => ({
