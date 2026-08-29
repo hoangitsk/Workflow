@@ -1272,32 +1272,32 @@ export default function ClientApp({
 
               <div>
                 <FieldLabel required>Tên ý tưởng ngắn gọn</FieldLabel>
-                <TextInput id="title" autoFocus required placeholder="VD: Phân tích tâm lý nhân vật Joker dưới góc nhìn điện ảnh & văn học..." />
+                <TextInput id="title" autoFocus required placeholder="VD: Phân tích tâm lý nhân vật Joker..." />
               </div>
 
               <div>
                 <FieldLabel>Logline (tóm tắt nội dung pitch)</FieldLabel>
-                <TextInput id="logline" placeholder="VD: Giải mã diễn biến tâm lý & hành vi thao túng qua bộ phim X dưới góc nhìn xã hội học..." />
+                <TextInput id="logline" placeholder="Tóm tắt ngắn gọn 1–2 câu về nội dung pitch..." />
               </div>
 
               <div>
                 <FieldLabel required>Mô tả chi tiết nội dung (Content)</FieldLabel>
-                <TextArea id="description" required rows={3} placeholder="VD: Phân tích 3 giai đoạn biến đổi tâm lý nhân vật, trích dẫn tác phẩm văn học gốc & bài học phản biện xã hội..." />
+                <TextArea id="description" required rows={3} placeholder="Chi tiết kịch bản dự kiến, các ý chính cần khai thác..." />
               </div>
 
               <div>
                 <FieldLabel>Link tham khảo (Reference)</FieldLabel>
-                <TextInput id="referenceLinks" placeholder="VD: Link video mẫu TikTok/YouTube, bài phân tích văn học, trích đoạn phim mẫu..." />
+                <TextInput id="referenceLinks" placeholder="Link video mẫu, bài viết, nhạc nền..." />
               </div>
 
               <div>
                 <FieldLabel>Hướng triển khai (Angle)</FieldLabel>
-                <TextInput id="angle" placeholder="VD: Đào sâu tâm lý học hành vi / So sánh mâu thuẫn giữa nguyên tác văn học & bản điện ảnh..." />
+                <TextInput id="angle" placeholder="Góc nhìn, hướng tiếp cận, phong cách kể chuyện..." />
               </div>
 
               <div>
                 <FieldLabel>Key message</FieldLabel>
-                <TextInput id="keyMessage" placeholder="VD: Sự cô đơn của con người trong xã hội hiện đại & bài học thấu cảm..." />
+                <TextInput id="keyMessage" placeholder="Thông điệp chính muốn truyền tải..." />
               </div>
 
               <div>
@@ -2217,27 +2217,27 @@ export default function ClientApp({
             <div className="space-y-3">
               <div>
                 <FieldLabel required>Tiêu đề ý tưởng</FieldLabel>
-                <TextInput id="editIdeaTitle" required defaultValue={editIdeaTarget.title} autoFocus placeholder="VD: Phân tích tâm lý nhân vật Joker dưới góc nhìn điện ảnh..." />
+                <TextInput id="editIdeaTitle" required defaultValue={editIdeaTarget.title} autoFocus placeholder="VD: Phân tích tâm lý nhân vật Joker..." />
               </div>
               <div>
                 <FieldLabel>Logline (tóm tắt nội dung pitch)</FieldLabel>
-                <TextInput id="editLogline" defaultValue={editIdeaTarget.logline || ""} placeholder="VD: Giải mã diễn biến tâm lý & hành vi thao túng qua bộ phim X..." />
+                <TextInput id="editLogline" defaultValue={editIdeaTarget.logline || ""} placeholder="Tóm tắt ngắn gọn 1–2 câu về nội dung pitch..." />
               </div>
               <div>
                 <FieldLabel>Mô tả chi tiết</FieldLabel>
-                <TextArea id="editIdeaDescription" rows={3} defaultValue={editIdeaTarget.description || ""} placeholder="VD: Phân tích 3 giai đoạn biến đổi tâm lý nhân vật, trích dẫn tác phẩm văn học..." />
+                <TextArea id="editIdeaDescription" rows={3} defaultValue={editIdeaTarget.description || ""} placeholder="Chi tiết kịch bản dự kiến, các ý chính cần khai thác..." />
               </div>
               <div>
                 <FieldLabel>Link tham khảo (Reference)</FieldLabel>
-                <TextInput id="editReferenceLinks" defaultValue={editIdeaTarget.referenceLinks || ""} placeholder="VD: Link video mẫu TikTok/YouTube, bài phân tích văn học..." />
+                <TextInput id="editReferenceLinks" defaultValue={editIdeaTarget.referenceLinks || ""} placeholder="Link video mẫu, bài viết, nhạc nền..." />
               </div>
               <div>
                 <FieldLabel>Hướng triển khai (Angle)</FieldLabel>
-                <TextInput id="editAngle" defaultValue={editIdeaTarget.angle || ""} placeholder="VD: Đào sâu tâm lý học hành vi / So sánh nguyên tác văn học & điện ảnh..." />
+                <TextInput id="editAngle" defaultValue={editIdeaTarget.angle || ""} placeholder="Góc nhìn, hướng tiếp cận, phong cách kể chuyện..." />
               </div>
               <div>
                 <FieldLabel>Key message</FieldLabel>
-                <TextInput id="editKeyMessage" defaultValue={editIdeaTarget.keyMessage || ""} placeholder="VD: Sự cô đơn của con người trong xã hội hiện đại & bài học thấu cảm..." />
+                <TextInput id="editKeyMessage" defaultValue={editIdeaTarget.keyMessage || ""} placeholder="Thông điệp chính muốn truyền tải..." />
               </div>
               <div>
                 <FieldLabel>Tuyến bài nội dung (Content Pillar)</FieldLabel>
