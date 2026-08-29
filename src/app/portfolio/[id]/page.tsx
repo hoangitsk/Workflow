@@ -92,7 +92,7 @@ export default async function PublicPortfolioPage({ params }: Props) {
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 mb-1.5">
                 <h1 className="text-2xl font-bold tracking-tight text-[#0F172A]">{member.name}</h1>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider bg-slate-100 text-slate-800 border border-slate-200">
-                  {member.role === "Core" ? "CORE TEAM" : (member.role === "E" ? "EDITOR" : "PRODUCER")}
+                  {member.role === "Core" ? "BAN ĐÀO TẠO (CORE)" : (member.role === "E" ? "BAN ĐÀO TẠO" : "BAN DỰ ÁN")}
                 </span>
               </div>
               

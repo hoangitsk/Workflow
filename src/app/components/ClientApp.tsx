@@ -217,20 +217,20 @@ function RoleChip({ role }: { role: string }) {
   if (norm === "Core") {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]">
-        CORE TEAM
+        BAN ĐÀO TẠO (CORE)
       </span>
     );
   }
   if (norm === "E") {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider bg-[#DBEAFE] text-[#1E40AF] border border-[#BFDBFE]">
-        EDITOR (ĐÀO TẠO)
+        BAN ĐÀO TẠO
       </span>
     );
   }
   return (
     <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider bg-[#F3E8FF] text-[#6B21A8] border border-[#E9D5FF]">
-      PRODUCER (DỰ ÁN)
+      BAN DỰ ÁN
     </span>
   );
 }
@@ -2015,9 +2015,9 @@ export default function ClientApp({
                 <div>
                   <FieldLabel required>Vai trò</FieldLabel>
                   <Select id="memberRole" required>
-                    <option value="P">Producer / Ban Dự án (P)</option>
-                    <option value="E">Editor / Ban Đào tạo (E)</option>
-                    <option value="Core">Core Team / Ban Điều hành</option>
+                    <option value="P">Ban Dự án</option>
+                    <option value="E">Ban Đào tạo</option>
+                    <option value="Core">Ban Đào tạo (Core)</option>
                   </Select>
                 </div>
                 <div>
@@ -2171,9 +2171,9 @@ export default function ClientApp({
                   <div>
                     <FieldLabel>Vai trò</FieldLabel>
                     <Select id="editRole" defaultValue={editProfile.role}>
-                      <option value="P">Producer / Ban Dự án (P)</option>
-                      <option value="E">Editor / Ban Đào tạo (E)</option>
-                      <option value="Core">Core Team / Ban Điều hành</option>
+                      <option value="P">Ban Dự án</option>
+                      <option value="E">Ban Đào tạo</option>
+                      <option value="Core">Ban Đào tạo (Core)</option>
                     </Select>
                   </div>
                   <div>
