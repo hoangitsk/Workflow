@@ -22,7 +22,15 @@ async function getIdeaRow(ideaId: string) {
   return rows[0] as any;
 }
 
-export async function submitIdeaAction(title: string, description: string, platformChannelId: string) {
+export async function submitIdeaAction(
+  title: string, 
+  description: string, 
+  platformChannelId: string,
+  logline?: string,
+  referenceLinks?: string,
+  angle?: string,
+  keyMessage?: string
+) {
   const member = await getCurrentMember();
   if (!member) throw new Error("Chưa đăng nhập");
 
@@ -31,7 +39,7 @@ export async function submitIdeaAction(title: string, description: string, platf
   }
 
   if (!description || !description.trim()) {
-    throw new Error("Mô tả ý tưởng là bắt buộc (nói về gì, góc quay/tone dự kiến, tham khảo nếu có)");
+    throw new Error("Mô tả ý tưởng là bắt buộc");
   }
 
   if (!platformChannelId || !platformChannelId.trim()) {
@@ -45,8 +53,9 @@ export async function submitIdeaAction(title: string, description: string, platf
   await sql.query(
     `INSERT INTO ideas (
       id, title, description, platform_channel_id, submitted_by_email,
-      status, created_at, credits_idea_by_email, last_pitch_week
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      status, created_at, credits_idea_by_email, last_pitch_week,
+      logline, reference_links, angle, key_message
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
     [
       ideaId,
       title.trim(),
@@ -56,7 +65,11 @@ export async function submitIdeaAction(title: string, description: string, platf
       "PITCH",
       now,
       member.id,
-      now.slice(0, 10)
+      now.slice(0, 10),
+      logline?.trim() || null,
+      referenceLinks?.trim() || null,
+      angle?.trim() || null,
+      keyMessage?.trim() || null
     ]
   );
 
@@ -376,7 +389,11 @@ export async function updateIdeaDetailsAction(
   description: string, 
   platformChannelId: string, 
   tags: string = "",
-  internalNote: string = ""
+  internalNote: string = "",
+  logline: string = "",
+  referenceLinks: string = "",
+  angle: string = "",
+  keyMessage: string = ""
 ) {
   const member = await getCurrentMember();
   if (!member) throw new Error("Chưa đăng nhập");
@@ -390,13 +407,13 @@ export async function updateIdeaDetailsAction(
   const sql = getDb();
   if (member.role === "Core") {
     await sql.query(
-      `UPDATE ideas SET title = $1, description = $2, platform_channel_id = $3, tags = $4, internal_note = $5 WHERE id = $6`,
-      [title.trim(), description.trim(), platformChannelId.trim(), tags.trim(), internalNote.trim(), ideaId]
+      `UPDATE ideas SET title = $1, description = $2, platform_channel_id = $3, tags = $4, internal_note = $5, logline = $6, reference_links = $7, angle = $8, key_message = $9 WHERE id = $10`,
+      [title.trim(), description.trim(), platformChannelId.trim(), tags.trim(), internalNote.trim(), logline.trim(), referenceLinks.trim(), angle.trim(), keyMessage.trim(), ideaId]
     );
   } else {
     await sql.query(
-      `UPDATE ideas SET title = $1, description = $2, platform_channel_id = $3, tags = $4 WHERE id = $5`,
-      [title.trim(), description.trim(), platformChannelId.trim(), tags.trim(), ideaId]
+      `UPDATE ideas SET title = $1, description = $2, platform_channel_id = $3, tags = $4, logline = $5, reference_links = $6, angle = $7, key_message = $8 WHERE id = $9`,
+      [title.trim(), description.trim(), platformChannelId.trim(), tags.trim(), logline.trim(), referenceLinks.trim(), angle.trim(), keyMessage.trim(), ideaId]
     );
   }
 
@@ -588,8 +605,9 @@ export async function cloneIdeaAction(ideaId: string) {
   await sql.query(
     `INSERT INTO ideas (
       id, title, description, platform_channel_id, submitted_by_email,
-      status, created_at, credits_idea_by_email, last_pitch_week, tags
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      status, created_at, credits_idea_by_email, last_pitch_week, tags,
+      logline, reference_links, angle, key_message
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
     [
       newIdeaId,
       sourceRow.title + " (Copy)",
@@ -600,7 +618,11 @@ export async function cloneIdeaAction(ideaId: string) {
       now,
       member.id,
       now.slice(0, 10),
-      sourceRow.tags || ''
+      sourceRow.tags || '',
+      sourceRow.logline || '',
+      sourceRow.reference_links || '',
+      sourceRow.angle || '',
+      sourceRow.key_message || ''
     ]
   );
 

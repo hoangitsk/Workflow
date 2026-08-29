@@ -1200,6 +1200,10 @@ export default function ClientApp({
             const form = e.currentTarget;
             const title = (form.elements.namedItem("title") as HTMLInputElement).value;
             const description = (form.elements.namedItem("description") as HTMLTextAreaElement).value;
+            const logline = (form.elements.namedItem("logline") as HTMLInputElement)?.value || "";
+            const referenceLinks = (form.elements.namedItem("referenceLinks") as HTMLInputElement)?.value || "";
+            const angle = (form.elements.namedItem("angle") as HTMLInputElement)?.value || "";
+            const keyMessage = (form.elements.namedItem("keyMessage") as HTMLInputElement)?.value || "";
             const platformChannelId = (form.elements.namedItem("platformChannel") as HTMLSelectElement).value;
 
             if (!description.trim()) {
@@ -1207,7 +1211,7 @@ export default function ClientApp({
               return;
             }
 
-            runAction(submitIdeaAction, title, description, platformChannelId);
+            runAction(submitIdeaAction, title, description, platformChannelId, logline, referenceLinks, angle, keyMessage);
             setShowNewIdea(false);
             showToast(`Đã nộp ý tưởng "${title}"`);
           }}>
@@ -1218,8 +1222,28 @@ export default function ClientApp({
               </div>
 
               <div>
-                <FieldLabel required>Mô tả chi tiết nội dung & link tham khảo</FieldLabel>
-                <TextArea id="description" required rows={3} placeholder="Nói về gì, góc quay/tone dự kiến, link tư liệu..." />
+                <FieldLabel>Logline (tóm tắt nội dung pitch)</FieldLabel>
+                <TextInput id="logline" placeholder="Tóm tắt ngắn gọn 1-2 câu về ý tưởng..." />
+              </div>
+
+              <div>
+                <FieldLabel required>Mô tả chi tiết nội dung (Content)</FieldLabel>
+                <TextArea id="description" required rows={3} placeholder="Nói về gì, chi tiết kịch bản dự kiến..." />
+              </div>
+
+              <div>
+                <FieldLabel>Link tham khảo (Reference)</FieldLabel>
+                <TextInput id="referenceLinks" placeholder="Các link video mẫu, bài viết, nhạc..." />
+              </div>
+
+              <div>
+                <FieldLabel>Hướng triển khai (Angle)</FieldLabel>
+                <TextInput id="angle" placeholder="Góc nhìn, cách kể chuyện, phong cách..." />
+              </div>
+
+              <div>
+                <FieldLabel>Key message</FieldLabel>
+                <TextInput id="keyMessage" placeholder="Thông điệp chính muốn truyền tải..." />
               </div>
 
               <div>
@@ -1605,11 +1629,13 @@ export default function ClientApp({
             const form = e.currentTarget;
             const name = (form.elements.namedItem("channelName") as HTMLInputElement).value;
             const color = (form.elements.namedItem("channelColor") as HTMLInputElement).value;
+            const referenceVideoLink = (form.elements.namedItem("referenceVideoLink") as HTMLInputElement)?.value || "";
+            const videoFormat = (form.elements.namedItem("videoFormat") as HTMLInputElement)?.value || "";
             const selectedPlatformIds = Array.from(
               (form.elements.namedItem("platformIds") as HTMLSelectElement).selectedOptions
             ).map(o => o.value);
             
-            runAction(createChannelGroupAction, name, color, selectedPlatformIds);
+            runAction(createChannelGroupAction, name, color, selectedPlatformIds, referenceVideoLink, videoFormat);
             setShowNewChannel(false);
             showToast(`Đã tạo kênh "${name}"`);
           }}>
@@ -1625,6 +1651,16 @@ export default function ClientApp({
                   <input type="color" name="channelColor" defaultValue={CHANNEL_PALETTE[channelGroups.length % CHANNEL_PALETTE.length]} className="w-8 h-8 rounded border border-slate-200 cursor-pointer" />
                   <span className="text-[11px] text-slate-500">Chọn màu để phân biệt kênh trên bảng Gantt và Pipeline.</span>
                 </div>
+              </div>
+
+              <div>
+                <FieldLabel>Link video mẫu tham khảo (Reference)</FieldLabel>
+                <TextInput id="referenceVideoLink" placeholder="Link YouTube/TikTok mẫu..." />
+              </div>
+
+              <div>
+                <FieldLabel>Dạng video sẽ làm</FieldLabel>
+                <TextInput id="videoFormat" placeholder="VD: Phỏng vấn ngắn, Review, Phim tài liệu..." />
               </div>
 
               <div>
@@ -1900,8 +1936,15 @@ export default function ClientApp({
             const form = e.currentTarget;
             const title = (form.elements.namedItem("editIdeaTitle") as HTMLInputElement).value;
             const description = (form.elements.namedItem("editIdeaDescription") as HTMLTextAreaElement).value;
+            const platformChannelId = (form.elements.namedItem("editPlatformChannelId") as HTMLSelectElement).value;
+            const tags = (form.elements.namedItem("editTags") as HTMLInputElement)?.value || "";
+            const internalNote = actor.role === "Core" ? (form.elements.namedItem("editInternalNote") as HTMLTextAreaElement)?.value || "" : "";
+            const logline = (form.elements.namedItem("editLogline") as HTMLInputElement)?.value || "";
+            const referenceLinks = (form.elements.namedItem("editReferenceLinks") as HTMLInputElement)?.value || "";
+            const angle = (form.elements.namedItem("editAngle") as HTMLInputElement)?.value || "";
+            const keyMessage = (form.elements.namedItem("editKeyMessage") as HTMLInputElement)?.value || "";
 
-            runAction(updateIdeaDetailsAction, editIdeaTarget.id, title, description);
+            runAction(updateIdeaDetailsAction, editIdeaTarget.id, title, description, platformChannelId, tags, internalNote, logline, referenceLinks, angle, keyMessage);
             setEditIdeaTarget(null);
             showToast("Đã cập nhật chi tiết ý tưởng");
           }}>
@@ -1911,9 +1954,45 @@ export default function ClientApp({
                 <TextInput id="editIdeaTitle" required defaultValue={editIdeaTarget.title} autoFocus />
               </div>
               <div>
-                <FieldLabel>Mô tả chi tiết</FieldLabel>
-                <TextArea id="editIdeaDescription" rows={4} defaultValue={editIdeaTarget.description || ""} />
+                <FieldLabel>Logline (tóm tắt nội dung pitch)</FieldLabel>
+                <TextInput id="editLogline" defaultValue={editIdeaTarget.logline || ""} />
               </div>
+              <div>
+                <FieldLabel>Mô tả chi tiết</FieldLabel>
+                <TextArea id="editIdeaDescription" rows={3} defaultValue={editIdeaTarget.description || ""} />
+              </div>
+              <div>
+                <FieldLabel>Link tham khảo (Reference)</FieldLabel>
+                <TextInput id="editReferenceLinks" defaultValue={editIdeaTarget.referenceLinks || ""} />
+              </div>
+              <div>
+                <FieldLabel>Hướng triển khai (Angle)</FieldLabel>
+                <TextInput id="editAngle" defaultValue={editIdeaTarget.angle || ""} />
+              </div>
+              <div>
+                <FieldLabel>Key message</FieldLabel>
+                <TextInput id="editKeyMessage" defaultValue={editIdeaTarget.keyMessage || ""} />
+              </div>
+              <div>
+                <FieldLabel>Kênh & Nền tảng</FieldLabel>
+                <Select id="editPlatformChannelId" defaultValue={editIdeaTarget.platformChannelId}>
+                  {platformChannels.map(pc => (
+                    <option key={pc.id} value={pc.id}>
+                      {channelGroupById[pc.channelGroupId]?.name} — {platformById[pc.platformId]?.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <FieldLabel>Tags (cách nhau bằng dấu phẩy)</FieldLabel>
+                <TextInput id="editTags" defaultValue={editIdeaTarget.tags || ""} />
+              </div>
+              {actor.role === "Core" && (
+                <div>
+                  <FieldLabel>Ghi chú nội bộ (Chỉ Core)</FieldLabel>
+                  <TextArea id="editInternalNote" rows={2} defaultValue={editIdeaTarget.internalNote || ""} />
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-slate-100">
@@ -2587,15 +2666,53 @@ function IdeaSlideOverDrawer({
             </div>
           )}
 
-          {/* DESCRIPTION */}
-          {idea.description && (
-            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 leading-relaxed">
-              <span className="font-bold text-slate-900 block mb-1 text-[11px] uppercase tracking-wider">
-                Mô tả chi tiết & kịch bản:
-              </span>
-              <p className="text-slate-700 whitespace-pre-line">{idea.description}</p>
-            </div>
-          )}
+          {/* PITCHING DETAILS */}
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 leading-relaxed space-y-3">
+            {idea.logline && (
+              <div>
+                <span className="font-bold text-slate-900 block mb-0.5 text-[11px] uppercase tracking-wider">
+                  Logline (tóm tắt):
+                </span>
+                <p className="text-slate-700 whitespace-pre-line">{idea.logline}</p>
+              </div>
+            )}
+            
+            {idea.description && (
+              <div>
+                <span className="font-bold text-slate-900 block mb-0.5 text-[11px] uppercase tracking-wider">
+                  Nội dung chi tiết (Content):
+                </span>
+                <p className="text-slate-700 whitespace-pre-line">{idea.description}</p>
+              </div>
+            )}
+
+            {idea.referenceLinks && (
+              <div>
+                <span className="font-bold text-slate-900 block mb-0.5 text-[11px] uppercase tracking-wider">
+                  Link tham khảo (Reference):
+                </span>
+                <p className="text-blue-600 hover:underline break-words"><a href={idea.referenceLinks} target="_blank" rel="noreferrer">{idea.referenceLinks}</a></p>
+              </div>
+            )}
+
+            {idea.angle && (
+              <div>
+                <span className="font-bold text-slate-900 block mb-0.5 text-[11px] uppercase tracking-wider">
+                  Hướng triển khai (Angle):
+                </span>
+                <p className="text-slate-700 whitespace-pre-line">{idea.angle}</p>
+              </div>
+            )}
+
+            {idea.keyMessage && (
+              <div>
+                <span className="font-bold text-slate-900 block mb-0.5 text-[11px] uppercase tracking-wider">
+                  Key message:
+                </span>
+                <p className="text-slate-700 whitespace-pre-line">{idea.keyMessage}</p>
+              </div>
+            )}
+          </div>
 
           {/* INTERNAL NOTES (FOR STUDIO / CORE) */}
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
@@ -2998,11 +3115,23 @@ function ChannelGanttView({
 
       {/* GANTT TIMELINE TABLE */}
       <div className="rounded-xl border border-[#E2E8F0] bg-white saas-shadow overflow-hidden">
-        <div className="p-4 border-b border-[#E2E8F0] bg-slate-50 flex items-center justify-between">
-          <h3 className="font-bold text-xs text-slate-900 uppercase">
-            Tiến độ sản xuất Kênh: {currentChannel?.name}
-          </h3>
-          <span className="text-xs text-slate-500 font-mono">Tháng {today.getMonth() + 1}/{today.getFullYear()}</span>
+        <div className="p-4 border-b border-[#E2E8F0] bg-slate-50 flex items-start justify-between">
+          <div>
+            <h3 className="font-bold text-xs text-slate-900 uppercase">
+              Tiến độ sản xuất Kênh: {currentChannel?.name}
+            </h3>
+            {currentChannel?.referenceVideoLink && (
+              <p className="text-[11px] text-slate-600 mt-1">
+                <span className="font-semibold">Video mẫu:</span> <a href={currentChannel.referenceVideoLink} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">{currentChannel.referenceVideoLink}</a>
+              </p>
+            )}
+            {currentChannel?.videoFormat && (
+              <p className="text-[11px] text-slate-600 mt-0.5">
+                <span className="font-semibold">Dạng video:</span> {currentChannel.videoFormat}
+              </p>
+            )}
+          </div>
+          <span className="text-xs text-slate-500 font-mono mt-1">Tháng {today.getMonth() + 1}/{today.getFullYear()}</span>
         </div>
 
         <div className="overflow-x-auto">

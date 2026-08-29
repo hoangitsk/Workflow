@@ -31,7 +31,7 @@ export async function createPlatformAction(name: string, defaultDurationDays: nu
 // -------------------------------------------------------------
 // CHANNEL GROUPS & PLATFORM CHANNELS
 // -------------------------------------------------------------
-export async function createChannelGroupAction(name: string, color: string, selectedPlatformIds: string[]) {
+export async function createChannelGroupAction(name: string, color: string, selectedPlatformIds: string[], referenceVideoLink?: string, videoFormat?: string) {
   const member = await getCurrentMember();
   if (!member) throw new Error("Chưa đăng nhập");
   if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền tạo kênh");
@@ -42,9 +42,9 @@ export async function createChannelGroupAction(name: string, color: string, sele
   const channelGroupId = `cg_${Date.now().toString(36)}`;
 
   await sql.query(
-    `INSERT INTO channel_groups (id, name, color, archived)
-     VALUES ($1, $2, $3, $4)`,
-    [channelGroupId, name.trim(), color || "#5B9EE8", false]
+    `INSERT INTO channel_groups (id, name, color, archived, reference_video_link, video_format)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [channelGroupId, name.trim(), color || "#5B9EE8", false, referenceVideoLink?.trim() || null, videoFormat?.trim() || null]
   );
 
   // Automatically create PlatformChannels for selected platforms

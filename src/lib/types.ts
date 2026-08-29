@@ -23,6 +23,8 @@ export interface ChannelGroup {
   name: string;
   color: string;
   archived: boolean;
+  referenceVideoLink?: string;
+  videoFormat?: string;
 }
 
 export interface PlatformChannel {
@@ -44,7 +46,11 @@ export type IdeaStatus =
 export interface Idea {
   id: string;
   title: string;
-  description: string;
+  description: string; // Nội dung
+  logline?: string;
+  referenceLinks?: string;
+  angle?: string;
+  keyMessage?: string;
   platformChannelId: string;
   submittedByEmail: string;
   status: IdeaStatus;
