@@ -285,6 +285,76 @@ function TextArea(props: any) {
   return <textarea {...props} className={"w-full px-3 py-2 text-xs outline-none transition-all focus:border-slate-900 focus:ring-1 focus:ring-slate-900/20 placeholder:text-slate-400 " + (props.className||"")} style={{ ...inputStyle, ...(props.style||{}) }} />; 
 }
 
+const EXPERTISE_PRESETS = [
+  "Content / Kịch bản",
+  "Video Editor / Dựng phim",
+  "Sáng tạo / Creative",
+  "Media / Quay phim",
+  "Truyền thông / Marketing",
+  "Quản lý / Điều hành",
+  "Duyệt bài / QA",
+  "Nhân sự / Vận hành"
+];
+
+function ExpertiseField({ 
+  id, 
+  name, 
+  defaultValue, 
+  label, 
+  placeholder 
+}: { 
+  id: string; 
+  name: string; 
+  defaultValue?: string; 
+  label: string; 
+  placeholder?: string; 
+}) {
+  const [val, setVal] = useState(defaultValue || "");
+
+  return (
+    <div>
+      <FieldLabel>{label}</FieldLabel>
+      <div className="relative">
+        <input
+          type="text"
+          id={id}
+          name={name}
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          list={`${id}-datalist`}
+          placeholder={placeholder || "Chọn hoặc tự nhập..."}
+          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-900"
+        />
+        <datalist id={`${id}-datalist`}>
+          {EXPERTISE_PRESETS.map((p) => (
+            <option key={p} value={p} />
+          ))}
+        </datalist>
+      </div>
+      <div className="flex flex-wrap gap-1 mt-1.5">
+        {EXPERTISE_PRESETS.map((preset) => {
+          const shortName = preset.split(' / ')[0];
+          const isSelected = val === preset || val.toLowerCase() === shortName.toLowerCase() || val.toLowerCase().includes(shortName.toLowerCase());
+          return (
+            <button
+              key={preset}
+              type="button"
+              onClick={() => setVal(preset)}
+              className={`text-[9.5px] px-1.5 py-0.5 rounded border transition-colors ${
+                isSelected 
+                  ? 'bg-slate-900 text-white border-slate-900 font-semibold' 
+                  : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
+              }`}
+            >
+              + {shortName}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function Btn({ children, onClick, tone = "default", disabled, type = "button", small, loading, className = "" }: any) {
   const tones: Record<string, { bg: string; fg: string; bd: string; hover: string }> = {
     default: { bg: "#FFFFFF", fg: "#334155", bd: "#E2E8F0", hover: "hover:bg-slate-50 hover:text-slate-900" },
@@ -2038,14 +2108,18 @@ export default function ClientApp({
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <FieldLabel>Chuyên môn chính</FieldLabel>
-                  <TextInput id="memberPrimaryExpertise" placeholder="Quay, Dựng, Kịch bản..." />
-                </div>
-                <div>
-                  <FieldLabel>Chuyên môn phụ</FieldLabel>
-                  <TextInput id="memberSecondaryExpertise" placeholder="Đồ hoạ, MC..." />
-                </div>
+                <ExpertiseField 
+                  id="memberPrimaryExpertise" 
+                  name="memberPrimaryExpertise" 
+                  label="Chuyên môn chính" 
+                  placeholder="VD: Content, Video Editor, Sáng tạo..." 
+                />
+                <ExpertiseField 
+                  id="memberSecondaryExpertise" 
+                  name="memberSecondaryExpertise" 
+                  label="Chuyên môn phụ" 
+                  placeholder="VD: Media, Thiết kế..." 
+                />
               </div>
             </div>
 
@@ -2157,14 +2231,20 @@ export default function ClientApp({
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <FieldLabel>Chuyên môn chính</FieldLabel>
-                  <TextInput id="editPrimaryExpertise" defaultValue={editProfile.primaryExpertise || ""} />
-                </div>
-                <div>
-                  <FieldLabel>Chuyên môn phụ</FieldLabel>
-                  <TextInput id="editSecondaryExpertise" defaultValue={editProfile.secondaryExpertise || ""} />
-                </div>
+                <ExpertiseField 
+                  id="editPrimaryExpertise" 
+                  name="editPrimaryExpertise" 
+                  defaultValue={editProfile.primaryExpertise || ""} 
+                  label="Chuyên môn chính" 
+                  placeholder="VD: Content, Video Editor, Sáng tạo..." 
+                />
+                <ExpertiseField 
+                  id="editSecondaryExpertise" 
+                  name="editSecondaryExpertise" 
+                  defaultValue={editProfile.secondaryExpertise || ""} 
+                  label="Chuyên môn phụ" 
+                  placeholder="VD: Media, Thiết kế..." 
+                />
               </div>
               {actor.role === "Core" && (
                 <div className="grid grid-cols-2 gap-3">
@@ -4061,7 +4141,14 @@ function MembersAndAuditView({
                 <UserAvatar name={m.name} size={28} />
                 <div className="min-w-0">
                   <div className="font-semibold text-xs text-slate-900 truncate">{m.name}</div>
-                  <div className="text-[10px] text-slate-500 truncate">{m.id}</div>
+                  <div className="text-[10px] text-slate-500 truncate flex items-center gap-1.5 mt-0.5">
+                    <span className="truncate">{m.id}</span>
+                    {m.primaryExpertise && (
+                      <span className="shrink-0 font-medium text-slate-600 bg-slate-200/70 px-1.5 py-0.2 rounded text-[9.5px] truncate max-w-[120px]">
+                        {m.primaryExpertise}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
