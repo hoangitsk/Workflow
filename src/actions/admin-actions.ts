@@ -191,6 +191,13 @@ export async function restoreChannelGroupAction(channelGroupId: string) {
 // -------------------------------------------------------------
 // MEMBERS
 // -------------------------------------------------------------
+function normalizeRole(r: string): 'Core' | 'E' | 'P' {
+  const clean = (r || '').trim().toLowerCase();
+  if (clean === 'core' || clean.includes('điều hành') || clean.includes('dieu hanh') || clean === 'quản lý' || clean === 'quan ly') return 'Core';
+  if (clean === 'e' || clean === 'editor' || clean.includes('đào tạo') || clean.includes('dao tao') || clean.includes('biên tập') || clean.includes('bien tap')) return 'E';
+  return 'P';
+}
+
 export async function createMemberAction(
   name: string, 
   role: string, 
@@ -222,6 +229,7 @@ export async function createMemberAction(
     ? password.trim() 
     : ((phone && phone.trim() !== "") ? phone.trim() : "123456");
   const hashedPassword = await bcrypt.hash(rawPassword, 10);
+  const mappedRole = normalizeRole(role);
 
   await sql.query(
     `INSERT INTO members (id, name, role, password, phone, facebook, primary_expertise, secondary_expertise, active)
@@ -229,7 +237,7 @@ export async function createMemberAction(
     [
       cleanEmail,
       name.trim(),
-      role || "P",
+      mappedRole,
       hashedPassword,
       phone || "",
       facebook || "",
@@ -277,9 +285,7 @@ export async function bulkImportMembersAction(
       continue;
     }
 
-    const validRoles = ["Core", "E", "Editor", "P", "Producer"];
-    const role = validRoles.includes(row.role) ? row.role : "P";
-    const mappedRole = role === "Editor" ? "E" : (role === "Producer" ? "P" : role);
+    const mappedRole = normalizeRole(row.role);
 
     const rawPass = (row.password && row.password.trim() !== '') 
       ? row.password.trim() 
@@ -338,7 +344,7 @@ export async function updateMemberProfileAction(
   const updatedFb = facebook !== undefined ? facebook : row.facebook;
   const updatedPrimary = primaryExpertise !== undefined ? primaryExpertise : row.primary_expertise;
   const updatedSecondary = secondaryExpertise !== undefined ? secondaryExpertise : row.secondary_expertise;
-  const updatedRole = (role && current.role === "Core") ? role : row.role;
+  const updatedRole = (role && current.role === "Core") ? normalizeRole(role) : row.role;
   
   let updatedPassword = row.password;
   if (password && password.trim() !== "") {

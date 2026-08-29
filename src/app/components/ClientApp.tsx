@@ -205,24 +205,32 @@ function Badge({ children, tone = "muted", className = "" }: { children: React.R
   );
 }
 
+function normalizeRole(r: string): 'Core' | 'E' | 'P' {
+  const clean = (r || '').trim().toLowerCase();
+  if (clean === 'core' || clean.includes('điều hành') || clean.includes('dieu hanh') || clean === 'quản lý' || clean === 'quan ly') return 'Core';
+  if (clean === 'e' || clean === 'editor' || clean.includes('đào tạo') || clean.includes('dao tao') || clean.includes('biên tập') || clean.includes('bien tap')) return 'E';
+  return 'P';
+}
+
 function RoleChip({ role }: { role: string }) {
-  if (role === "Core") {
+  const norm = normalizeRole(role);
+  if (norm === "Core") {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]">
         CORE TEAM
       </span>
     );
   }
-  if (role === "E") {
+  if (norm === "E") {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider bg-[#DBEAFE] text-[#1E40AF] border border-[#BFDBFE]">
-        EDITOR
+        EDITOR (ĐÀO TẠO)
       </span>
     );
   }
   return (
     <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider bg-[#F3E8FF] text-[#6B21A8] border border-[#E9D5FF]">
-      PRODUCER
+      PRODUCER (DỰ ÁN)
     </span>
   );
 }
@@ -2007,9 +2015,9 @@ export default function ClientApp({
                 <div>
                   <FieldLabel required>Vai trò</FieldLabel>
                   <Select id="memberRole" required>
-                    <option value="P">Producer (P)</option>
-                    <option value="Editor">Editor</option>
-                    <option value="Core">Core Team</option>
+                    <option value="P">Producer / Ban Dự án (P)</option>
+                    <option value="E">Editor / Ban Đào tạo (E)</option>
+                    <option value="Core">Core Team / Ban Điều hành</option>
                   </Select>
                 </div>
                 <div>
@@ -2163,9 +2171,9 @@ export default function ClientApp({
                   <div>
                     <FieldLabel>Vai trò</FieldLabel>
                     <Select id="editRole" defaultValue={editProfile.role}>
-                      <option value="P">Producer (P)</option>
-                      <option value="Editor">Editor</option>
-                      <option value="Core">Core Team</option>
+                      <option value="P">Producer / Ban Dự án (P)</option>
+                      <option value="E">Editor / Ban Đào tạo (E)</option>
+                      <option value="Core">Core Team / Ban Điều hành</option>
                     </Select>
                   </div>
                   <div>
@@ -3920,7 +3928,7 @@ function MembersAndAuditView({
         const parsed = dataRows.map(cols => ({
           name: cols[0] || '',
           email: cols[1] || '',
-          role: cols[2] || 'P',
+          role: normalizeRole(cols[2] || 'P'),
           password: cols[3] || '123456',
           phone: cols[4] || '',
           facebook: cols[5] || '',
