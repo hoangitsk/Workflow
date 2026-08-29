@@ -31,7 +31,7 @@ export async function createPlatformAction(name: string, defaultDurationDays: nu
 // -------------------------------------------------------------
 // CHANNEL GROUPS & PLATFORM CHANNELS
 // -------------------------------------------------------------
-export async function createChannelGroupAction(name: string, color: string, selectedPlatformIds: string[], referenceVideoLink?: string, videoFormat?: string) {
+export async function createChannelGroupAction(name: string, color: string, selectedPlatformIds: string[], description?: string, referenceVideoLink?: string, videoFormat?: string) {
   const member = await getCurrentMember();
   if (!member) throw new Error("Chưa đăng nhập");
   if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền tạo kênh");
@@ -42,9 +42,9 @@ export async function createChannelGroupAction(name: string, color: string, sele
   const channelGroupId = `cg_${Date.now().toString(36)}`;
 
   await sql.query(
-    `INSERT INTO channel_groups (id, name, color, archived, reference_video_link, video_format)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [channelGroupId, name.trim(), color || "#5B9EE8", false, referenceVideoLink?.trim() || null, videoFormat?.trim() || null]
+    `INSERT INTO channel_groups (id, name, color, archived, description, reference_video_link, video_format)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [channelGroupId, name.trim(), color || "#5B9EE8", false, description?.trim() || null, referenceVideoLink?.trim() || null, videoFormat?.trim() || null]
   );
 
   // Automatically create PlatformChannels for selected platforms
@@ -62,6 +62,25 @@ export async function createChannelGroupAction(name: string, color: string, sele
   }
 
   await recordAuditLog('', member.id, "Tạo Kênh mới", { name, color, platforms: platformsToAssign });
+  revalidatePath("/");
+}
+
+export async function updateChannelGroupAction(channelGroupId: string, name: string, color: string, description?: string, referenceVideoLink?: string, videoFormat?: string) {
+  const member = await getCurrentMember();
+  if (!member) throw new Error("Chưa đăng nhập");
+  if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền chỉnh sửa kênh");
+
+  if (!name || !name.trim()) throw new Error("Tên kênh không được để trống");
+
+  const sql = getDb();
+  await sql.query(
+    `UPDATE channel_groups 
+     SET name = $1, color = $2, description = $3, reference_video_link = $4, video_format = $5 
+     WHERE id = $6`,
+    [name.trim(), color || "#5B9EE8", description?.trim() || null, referenceVideoLink?.trim() || null, videoFormat?.trim() || null, channelGroupId]
+  );
+
+  await recordAuditLog('', member.id, "Cập nhật thông tin kênh", { channelGroupId, name });
   revalidatePath("/");
 }
 

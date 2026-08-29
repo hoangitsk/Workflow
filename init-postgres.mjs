@@ -43,6 +43,7 @@ async function initSchema() {
       name VARCHAR(255) NOT NULL,
       color VARCHAR(50) NOT NULL DEFAULT '#5B9EE8',
       archived BOOLEAN NOT NULL DEFAULT FALSE,
+      description TEXT,
       reference_video_link TEXT,
       video_format TEXT
     );
@@ -161,6 +162,9 @@ async function initSchema() {
     await sql.query(`ALTER TABLE ideas ADD COLUMN key_message TEXT;`);
   } catch (e) { /* ignores if exists */ }
 
+  try {
+    await sql.query(`ALTER TABLE channel_groups ADD COLUMN description TEXT;`);
+  } catch (e) { /* ignores if exists */ }
   try {
     await sql.query(`ALTER TABLE channel_groups ADD COLUMN reference_video_link TEXT;`);
   } catch (e) { /* ignores if exists */ }

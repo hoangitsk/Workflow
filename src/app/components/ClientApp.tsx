@@ -23,7 +23,7 @@ import {
   updateIdeaNoteAction, rateIdeaAction, cloneIdeaAction
 } from "../../actions/idea-actions";
 import { 
-  createChannelGroupAction, archiveChannelGroupAction, restoreChannelGroupAction, 
+  createChannelGroupAction, updateChannelGroupAction, archiveChannelGroupAction, restoreChannelGroupAction, 
   createPlatformAction, createMemberAction, removeMemberAction, updateMemberProfileAction, 
   toggleMemberActiveAction, updateSettingsAction, bulkImportMembersAction 
 } from "../../actions/admin-actions";
@@ -476,6 +476,8 @@ export default function ClientApp({
   const [cancelIdeaTarget, setCancelIdeaTarget] = useState<Idea | null>(null);
   const [schedulePostTarget, setSchedulePostTarget] = useState<Idea | null>(null);
   const [showNewChannel, setShowNewChannel] = useState(false);
+  const [editChannelTarget, setEditChannelTarget] = useState<ChannelGroup | null>(null);
+  const [selectedPcId, setSelectedPcId] = useState<string>("");
   const [showNewPlatform, setShowNewPlatform] = useState(false);
   const [showNewMember, setShowNewMember] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -1075,6 +1077,7 @@ export default function ClientApp({
               monthOffset={ganttMonthOffset}
               setMonthOffset={setGanttMonthOffset}
               onNewChannel={() => setShowNewChannel(true)}
+              onEditChannel={setEditChannelTarget}
               onNewPlatform={() => setShowNewPlatform(true)}
               onDeleteChannel={setConfirmDeleteChannel}
               onRestoreChannel={(c: any) => runAction(restoreChannelGroupAction, c.id)}
@@ -1248,7 +1251,12 @@ export default function ClientApp({
 
               <div>
                 <FieldLabel required>Kênh & Nền tảng</FieldLabel>
-                <Select id="platformChannel" required>
+                <Select 
+                  id="platformChannel" 
+                  required
+                  value={selectedPcId || platformChannels[0]?.id}
+                  onChange={(e: any) => setSelectedPcId(e.target.value)}
+                >
                   {platformChannels.map((pc) => {
                     const ch = channelGroupById[pc.channelGroupId];
                     const pl = platformById[pc.platformId];
@@ -1259,6 +1267,36 @@ export default function ClientApp({
                     );
                   })}
                 </Select>
+
+                {(() => {
+                  const activePcId = selectedPcId || platformChannels[0]?.id;
+                  const currentPc = pcById[activePcId];
+                  const currentCh = currentPc ? channelGroupById[currentPc.channelGroupId] : null;
+                  if (!currentCh) return null;
+                  if (!currentCh.description && !currentCh.videoFormat && !currentCh.referenceVideoLink) return null;
+                  return (
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1.5 mt-2.5">
+                      <div className="flex items-center gap-1.5 text-slate-800 font-semibold text-[11px] uppercase tracking-wider">
+                        <Sparkles size={13} className="text-amber-500 shrink-0" />
+                        <span>Định hướng & Reference Kênh: {currentCh.name}</span>
+                      </div>
+                      {currentCh.description && (
+                        <p className="text-slate-700 leading-relaxed"><span className="font-semibold text-slate-900">Mô tả định hướng:</span> {currentCh.description}</p>
+                      )}
+                      {currentCh.videoFormat && (
+                        <p className="text-slate-700"><span className="font-semibold text-slate-900">Dạng video làm:</span> {currentCh.videoFormat}</p>
+                      )}
+                      {currentCh.referenceVideoLink && (
+                        <p className="text-slate-700 break-words">
+                          <span className="font-semibold text-slate-900">Video mẫu tham khảo:</span>{" "}
+                          <a href={currentCh.referenceVideoLink} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                            {currentCh.referenceVideoLink} <ExternalLink size={11} />
+                          </a>
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
@@ -1629,20 +1667,21 @@ export default function ClientApp({
             const form = e.currentTarget;
             const name = (form.elements.namedItem("channelName") as HTMLInputElement).value;
             const color = (form.elements.namedItem("channelColor") as HTMLInputElement).value;
+            const description = (form.elements.namedItem("channelDescription") as HTMLTextAreaElement)?.value || "";
             const referenceVideoLink = (form.elements.namedItem("referenceVideoLink") as HTMLInputElement)?.value || "";
             const videoFormat = (form.elements.namedItem("videoFormat") as HTMLInputElement)?.value || "";
             const selectedPlatformIds = Array.from(
               (form.elements.namedItem("platformIds") as HTMLSelectElement).selectedOptions
             ).map(o => o.value);
             
-            runAction(createChannelGroupAction, name, color, selectedPlatformIds, referenceVideoLink, videoFormat);
+            runAction(createChannelGroupAction, name, color, selectedPlatformIds, description, referenceVideoLink, videoFormat);
             setShowNewChannel(false);
             showToast(`Đã tạo kênh "${name}"`);
           }}>
             <div className="space-y-3">
               <div>
                 <FieldLabel required>Tên Kênh</FieldLabel>
-                <TextInput id="channelName" autoFocus required placeholder="VD: YNDA Phim Ngắn, YNDA Podcast..." />
+                <TextInput id="channelName" autoFocus required placeholder="VD: YNDA Phim Ngắn, YNDA Tâm Lý..." />
               </div>
 
               <div>
@@ -1654,13 +1693,18 @@ export default function ClientApp({
               </div>
 
               <div>
-                <FieldLabel>Link video mẫu tham khảo (Reference)</FieldLabel>
-                <TextInput id="referenceVideoLink" placeholder="Link YouTube/TikTok mẫu..." />
+                <FieldLabel>Mô tả định hướng nội dung của Kênh</FieldLabel>
+                <TextArea id="channelDescription" rows={3} placeholder="Ví dụ: Kênh chuyên phân tích tâm lý con người, hướng đến người trẻ 18-25..." />
               </div>
 
               <div>
                 <FieldLabel>Dạng video sẽ làm</FieldLabel>
-                <TextInput id="videoFormat" placeholder="VD: Phỏng vấn ngắn, Review, Phim tài liệu..." />
+                <TextInput id="videoFormat" placeholder="VD: Host nói + cắt ghép, Phim ngắn, Animation, Review..." />
+              </div>
+
+              <div>
+                <FieldLabel>Link video mẫu tham khảo (Reference Video)</FieldLabel>
+                <TextInput id="referenceVideoLink" placeholder="Link YouTube/TikTok mẫu để team tham khảo..." />
               </div>
 
               <div>
@@ -1677,6 +1721,60 @@ export default function ClientApp({
             <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-slate-100">
               <Btn onClick={() => setShowNewChannel(false)}>Huỷ</Btn>
               <Btn tone="primary" type="submit" loading={isPending}>Tạo Kênh</Btn>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* EDIT CHANNEL MODAL */}
+      {editChannelTarget && (
+        <Modal title={`Chỉnh sửa Kênh: ${editChannelTarget.name}`} onClose={() => setEditChannelTarget(null)}>
+          <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
+            e.preventDefault();
+            const form = e.currentTarget;
+            const name = (form.elements.namedItem("editChannelName") as HTMLInputElement).value;
+            const color = (form.elements.namedItem("editChannelColor") as HTMLInputElement).value;
+            const description = (form.elements.namedItem("editChannelDescription") as HTMLTextAreaElement)?.value || "";
+            const referenceVideoLink = (form.elements.namedItem("editReferenceVideoLink") as HTMLInputElement)?.value || "";
+            const videoFormat = (form.elements.namedItem("editVideoFormat") as HTMLInputElement)?.value || "";
+            
+            runAction(updateChannelGroupAction, editChannelTarget.id, name, color, description, referenceVideoLink, videoFormat);
+            setEditChannelTarget(null);
+            showToast(`Đã cập nhật kênh "${name}"`);
+          }}>
+            <div className="space-y-3">
+              <div>
+                <FieldLabel required>Tên Kênh</FieldLabel>
+                <TextInput id="editChannelName" autoFocus required defaultValue={editChannelTarget.name} />
+              </div>
+
+              <div>
+                <FieldLabel>Màu đại diện</FieldLabel>
+                <div className="flex items-center gap-2">
+                  <input type="color" name="editChannelColor" defaultValue={editChannelTarget.color || "#5B9EE8"} className="w-8 h-8 rounded border border-slate-200 cursor-pointer" />
+                  <span className="text-[11px] text-slate-500">Chọn màu đại diện trên tiến độ sản xuất.</span>
+                </div>
+              </div>
+
+              <div>
+                <FieldLabel>Mô tả định hướng nội dung của Kênh</FieldLabel>
+                <TextArea id="editChannelDescription" rows={3} defaultValue={editChannelTarget.description || ""} placeholder="Mô tả phong cách, đối tượng khán giả, chủ đề chính..." />
+              </div>
+
+              <div>
+                <FieldLabel>Dạng video sẽ làm</FieldLabel>
+                <TextInput id="editVideoFormat" defaultValue={editChannelTarget.videoFormat || ""} placeholder="VD: Cắt ghép, Host nói, Animation..." />
+              </div>
+
+              <div>
+                <FieldLabel>Link video mẫu tham khảo (Reference Video)</FieldLabel>
+                <TextInput id="editReferenceVideoLink" defaultValue={editChannelTarget.referenceVideoLink || ""} placeholder="Link YouTube / TikTok video mẫu..." />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-slate-100">
+              <Btn onClick={() => setEditChannelTarget(null)}>Huỷ</Btn>
+              <Btn tone="primary" type="submit" loading={isPending}>Lưu thay đổi</Btn>
             </div>
           </form>
         </Modal>
@@ -3065,6 +3163,7 @@ function ChannelGanttView({
   monthOffset,
   setMonthOffset,
   onNewChannel,
+  onEditChannel,
   onNewPlatform,
   onDeleteChannel,
   onRestoreChannel,
@@ -3105,9 +3204,14 @@ function ChannelGanttView({
             <Btn small onClick={onNewChannel}><Plus size={12} /> Thêm Kênh</Btn>
             <Btn small onClick={onNewPlatform}><Plus size={12} /> Thêm Nền tảng</Btn>
             {currentChannel && (
-              <Btn small tone="danger" onClick={() => onDeleteChannel(currentChannel)}>
-                <Trash2 size={12} /> Xoá kênh
-              </Btn>
+              <>
+                <Btn small tone="default" onClick={() => onEditChannel(currentChannel)}>
+                  <PenLine size={12} /> Chỉnh sửa kênh
+                </Btn>
+                <Btn small tone="danger" onClick={() => onDeleteChannel(currentChannel)}>
+                  <Trash2 size={12} /> Xoá kênh
+                </Btn>
+              </>
             )}
           </div>
         )}
@@ -3120,14 +3224,22 @@ function ChannelGanttView({
             <h3 className="font-bold text-xs text-slate-900 uppercase">
               Tiến độ sản xuất Kênh: {currentChannel?.name}
             </h3>
-            {currentChannel?.referenceVideoLink && (
+            {currentChannel?.description && (
               <p className="text-[11px] text-slate-600 mt-1">
-                <span className="font-semibold">Video mẫu:</span> <a href={currentChannel.referenceVideoLink} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">{currentChannel.referenceVideoLink}</a>
+                <span className="font-semibold text-slate-800">Mô tả định hướng:</span> {currentChannel.description}
               </p>
             )}
             {currentChannel?.videoFormat && (
               <p className="text-[11px] text-slate-600 mt-0.5">
-                <span className="font-semibold">Dạng video:</span> {currentChannel.videoFormat}
+                <span className="font-semibold text-slate-800">Dạng video làm:</span> {currentChannel.videoFormat}
+              </p>
+            )}
+            {currentChannel?.referenceVideoLink && (
+              <p className="text-[11px] text-slate-600 mt-0.5">
+                <span className="font-semibold text-slate-800">Video mẫu tham khảo:</span>{" "}
+                <a href={currentChannel.referenceVideoLink} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                  {currentChannel.referenceVideoLink}
+                </a>
               </p>
             )}
           </div>

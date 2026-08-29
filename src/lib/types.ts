@@ -23,6 +23,7 @@ export interface ChannelGroup {
   name: string;
   color: string;
   archived: boolean;
+  description?: string;
   referenceVideoLink?: string;
   videoFormat?: string;
 }

@@ -76,7 +76,10 @@ export async function getAllData(): Promise<{
     id: r.id,
     name: r.name,
     color: r.color || '#5B9EE8',
-    archived: r.archived === true
+    archived: r.archived === true,
+    description: r.description || '',
+    referenceVideoLink: r.reference_video_link || '',
+    videoFormat: r.video_format || ''
   }));
 
   const platformChannels: PlatformChannel[] = platformChannelsRows.map((r: any) => ({
@@ -89,6 +92,10 @@ export async function getAllData(): Promise<{
     id: r.id,
     title: r.title || '',
     description: r.description || '',
+    logline: r.logline || '',
+    referenceLinks: r.reference_links || '',
+    angle: r.angle || '',
+    keyMessage: r.key_message || '',
     platformChannelId: r.platform_channel_id || '',
     submittedByEmail: r.submitted_by_email || '',
     status: (r.status || 'PITCH') as any,
