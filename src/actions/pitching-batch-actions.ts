@@ -9,7 +9,9 @@ import { revalidatePath } from "next/cache";
 
 export async function createPitchingBatchAction(
   title: string,
+  category: string,
   description: string,
+  exampleAngles: string,
   deadline: string,
   channelGroupId?: string
 ) {
@@ -25,12 +27,14 @@ export async function createPitchingBatchAction(
   const now = new Date().toISOString();
 
   await sql.query(
-    `INSERT INTO pitching_batches (id, title, description, deadline, channel_group_id, created_by_email, created_at, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    `INSERT INTO pitching_batches (id, title, category, description, example_angles, deadline, channel_group_id, created_by_email, created_at, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
     [
       batchId,
       title.trim(),
-      description.trim(),
+      category?.trim() || "Chung",
+      description?.trim() || null,
+      exampleAngles?.trim() || null,
       deadline.trim(),
       channelGroupId?.trim() || null,
       member.id,
@@ -46,17 +50,19 @@ export async function createPitchingBatchAction(
       m.id,
       'pitch_batch',
       batchId,
-      `📢 ĐỢT CALL PITCHING MỚI: "${title.trim()}" (Hạn nộp: ${deadline.trim()})`
+      `📢 ĐỢT CALL PITCHING MỚI: "${title.trim()}" [${category.trim()}] (Hạn nộp: ${deadline.trim()})`
     );
   }
 
   // Audit log
-  await recordAuditLog('', member.id, "Tạo đợt Call Pitching mới", { title: title.trim(), deadline });
+  await recordAuditLog('', member.id, "Tạo đợt Call Pitching mới", { title: title.trim(), category, deadline });
 
   // Discord notification to team channel
-  await sendDiscordWebhook(
-    `📢 **ĐỢT CALL PITCHING MỚI: "${title.trim()}"**\n> ⏰ Hạn nộp ý tưởng: **${deadline.trim()}**${description ? `\n> 📝 Yêu cầu: ${description.trim()}` : ''}`
-  );
+  let discordMsg = `📢 **ĐỢT CALL PITCHING MỚI: "${title.trim()}"**\n> 🏷️ **Định hướng / Giai đoạn:** ${category.trim() || 'Chung'}\n> ⏰ **Hạn chót nộp ý tưởng:** ${deadline.trim()}`;
+  if (description?.trim()) discordMsg += `\n> 📝 **Yêu cầu nội dung:** ${description.trim()}`;
+  if (exampleAngles?.trim()) discordMsg += `\n> 💡 **Ví dụ & Cách đào sâu:** ${exampleAngles.trim()}`;
+
+  await sendDiscordWebhook(discordMsg);
 
   revalidatePath("/");
   return { success: true, id: batchId };

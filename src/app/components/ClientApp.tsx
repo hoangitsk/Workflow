@@ -1232,6 +1232,34 @@ export default function ClientApp({
             showToast(`Đã nộp ý tưởng "${title}"`);
           }}>
             <div className="space-y-3">
+              {(() => {
+                const openBatch = pitchingBatches?.find((b: PitchingBatch) => b.status === "OPEN");
+                if (!openBatch) return null;
+                return (
+                  <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-3 text-xs space-y-1.5 mb-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-amber-900 flex items-center gap-1 uppercase tracking-wider text-[11px]">
+                        <Flame size={13} className="text-amber-500" /> Đợt Pitching Đang Mở: {openBatch.title}
+                      </span>
+                      {openBatch.category && (
+                        <span className="bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded text-[10px] font-bold shrink-0">
+                          🎯 {openBatch.category}
+                        </span>
+                      )}
+                    </div>
+                    {openBatch.description && (
+                      <p className="text-slate-700"><span className="font-semibold text-slate-900">Yêu cầu:</span> {openBatch.description}</p>
+                    )}
+                    {openBatch.exampleAngles && (
+                      <div className="text-slate-700 bg-amber-100/60 p-2 rounded-lg border border-amber-200/60 text-[11px]">
+                        <span className="font-semibold text-amber-900 block mb-0.5">💡 Gợi ý đào sâu & Ví dụ từ Studio:</span>
+                        <span className="italic">{openBatch.exampleAngles}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div>
                 <FieldLabel required>Tên ý tưởng ngắn gọn</FieldLabel>
                 <TextInput id="title" autoFocus required placeholder="VD: 5 mẹo góc máy điện ảnh..." />
@@ -1870,18 +1898,31 @@ export default function ClientApp({
             e.preventDefault();
             const form = e.currentTarget;
             const title = (form.elements.namedItem("batchTitle") as HTMLInputElement).value;
+            const category = (form.elements.namedItem("batchCategory") as HTMLSelectElement)?.value || "Branding / Nhân vật";
             const description = (form.elements.namedItem("batchDescription") as HTMLTextAreaElement)?.value || "";
+            const exampleAngles = (form.elements.namedItem("batchExampleAngles") as HTMLTextAreaElement)?.value || "";
             const deadline = (form.elements.namedItem("batchDeadline") as HTMLInputElement).value;
             const channelGroupId = (form.elements.namedItem("batchChannelGroup") as HTMLSelectElement)?.value || "";
             
-            runAction(createPitchingBatchAction, title, description, deadline, channelGroupId);
+            runAction(createPitchingBatchAction, title, category, description, exampleAngles, deadline, channelGroupId);
             setShowNewPitchingBatchModal(false);
             showToast(`Đã phát động đợt Call Pitching "${title}" & gửi thông báo lên nhóm!`);
           }}>
             <div className="space-y-3">
               <div>
+                <FieldLabel required>Giai đoạn & Định hướng đợt này</FieldLabel>
+                <Select id="batchCategory" required>
+                  <option value="Branding & Xây dựng Nhân vật">🎯 Branding & Xây dựng Nhân vật (Personal Branding, Phân tích tính cách...)</option>
+                  <option value="News & Đu Trend Xã hội">⚡ News & Đu Trend Xã hội (Tin hot, Sự kiện xã hội -> Đào phim/chủ đề)</option>
+                  <option value="Series Chuyên môn">📚 Series Chuyên môn & Kiến thức chuyên sâu</option>
+                  <option value="Review & Phân tích tác phẩm">🎬 Review & Phân tích Tác phẩm (Phim, Podcast, Drama)</option>
+                  <option value="Khác">💡 Định hướng khác</option>
+                </Select>
+              </div>
+
+              <div>
                 <FieldLabel required>Tiêu đề đợt Call Pitching</FieldLabel>
-                <TextInput id="batchTitle" autoFocus required placeholder="VD: Săn Idea Tuần 35 — Chủ đề Tâm Lý & Đời Sống" />
+                <TextInput id="batchTitle" autoFocus required placeholder="VD: Săn Idea Tuần 35 — Chuỗi phân tích hành vi nhân vật" />
               </div>
 
               <div>
@@ -1890,8 +1931,13 @@ export default function ClientApp({
               </div>
 
               <div>
-                <FieldLabel>Yêu cầu & Định hướng nội dung đợt này</FieldLabel>
-                <TextArea id="batchDescription" rows={3} placeholder="Mô tả số lượng video cần nhận, chủ đề tập trung, phong cách mong muốn..." />
+                <FieldLabel>Yêu cầu & Định hướng chi tiết đợt này</FieldLabel>
+                <TextArea id="batchDescription" rows={2} placeholder="VD: Kênh đang trong giai đoạn xây dựng nhân vật, cần tập trung các bài phân tích tính cách..." />
+              </div>
+
+              <div>
+                <FieldLabel>Gợi ý & Ví dụ cách đào sâu (Example Angles)</FieldLabel>
+                <TextArea id="batchExampleAngles" rows={3} placeholder="VD: Tìm 1 bộ phim/tin tức hot -> Đào sâu phân tích hành vi nhân vật под góc nhìn chuyên gia; Chuyên môn -> Xây dựng tính cách nhân vật..." />
               </div>
 
               <div>
@@ -2283,11 +2329,16 @@ function DashboardView({
       {/* ACTIVE CALL PITCHING BANNER */}
       {activeBatch && (
         <div className="p-4 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white saas-shadow flex flex-wrap items-center justify-between gap-3">
-          <div className="space-y-1 max-w-2xl">
-            <div className="flex items-center gap-2">
+          <div className="space-y-1.5 max-w-2xl">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="bg-white/20 backdrop-blur-xs text-white font-bold text-[10px] uppercase px-2.5 py-0.5 rounded-full tracking-wider flex items-center gap-1">
                 <Flame size={12} className="text-amber-200 animate-pulse" /> Đợt Call Pitching Đang Mở
               </span>
+              {activeBatch.category && (
+                <span className="bg-amber-900/30 text-amber-100 font-bold text-[10px] uppercase px-2 py-0.5 rounded-md border border-amber-200/30">
+                  🎯 {activeBatch.category}
+                </span>
+              )}
               <span className="text-xs font-semibold bg-black/20 px-2.5 py-0.5 rounded-md text-amber-100 flex items-center gap-1">
                 <Clock size={12} /> Hạn chót: {activeBatch.deadline}
               </span>
@@ -2296,9 +2347,15 @@ function DashboardView({
               {activeBatch.title}
             </h3>
             {activeBatch.description && (
-              <p className="text-xs text-amber-50/95 leading-relaxed line-clamp-2">
-                {activeBatch.description}
+              <p className="text-xs text-amber-50/95 leading-relaxed">
+                <span className="font-semibold text-white">Yêu cầu:</span> {activeBatch.description}
               </p>
+            )}
+            {activeBatch.exampleAngles && (
+              <div className="text-xs bg-black/20 p-2 rounded-lg border border-white/10 text-amber-100 leading-relaxed">
+                <span className="font-semibold text-white block text-[11px] uppercase tracking-wider mb-0.5">💡 Gợi ý & Ví dụ cách đào sâu:</span>
+                <span className="italic">{activeBatch.exampleAngles}</span>
+              </div>
             )}
           </div>
 

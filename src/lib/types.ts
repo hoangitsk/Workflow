@@ -89,7 +89,9 @@ export interface Idea {
 export interface PitchingBatch {
   id: string;
   title: string;
+  category?: string; // e.g. "Branding & Nhân vật", "News & Hot Trend", "Series Chuyên môn"
   description?: string;
+  exampleAngles?: string; // Ví dụ gợi ý cách đào sâu
   deadline: string;
   channelGroupId?: string;
   createdByEmail: string;

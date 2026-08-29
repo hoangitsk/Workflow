@@ -175,7 +175,9 @@ export async function getAllData(): Promise<{
   const pitchingBatches: PitchingBatch[] = pitchingBatchesRows.map((r: any) => ({
     id: r.id,
     title: r.title || '',
+    category: r.category || '',
     description: r.description || '',
+    exampleAngles: r.example_angles || '',
     deadline: r.deadline || '',
     channelGroupId: r.channel_group_id || '',
     createdByEmail: r.created_by_email || '',
