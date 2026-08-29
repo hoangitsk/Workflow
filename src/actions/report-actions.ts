@@ -1,6 +1,6 @@
 "use server";
 
-import { getAllData } from "../lib/sheets";
+import { getAllData } from "../lib/db";
 import { getCurrentMember } from "./auth-actions";
 import { sendDiscordWebhook } from "./notification-actions";
 import { recordAuditLog } from "./audit-actions";

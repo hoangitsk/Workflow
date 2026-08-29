@@ -3,7 +3,7 @@
 import { getDb } from "../lib/db";
 import { getCurrentMember } from "./auth-actions";
 import { recordAuditLog } from "./audit-actions";
-import { createNotification, sendDiscordWebhook } from "./notification-actions";
+import { createNotification, sendDiscordWebhook, getWebhookUrlForPlatformChannel } from "./notification-actions";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
 
@@ -78,8 +78,14 @@ export async function submitIdeaAction(
   // Audit log
   await recordAuditLog(ideaId, member.id, "Nộp ý tưởng mới", { title: title.trim(), description: description.trim() });
 
-  // Discord notification to #core
-  await sendDiscordWebhook(`💡 **${member.name}** vừa nộp ý tưởng mới: **"${title.trim()}"**\n> ${description.trim().slice(0, 150)}`);
+  // Discord notification to channel thread / idea webhook
+  const channelWebhook = await getWebhookUrlForPlatformChannel(platformChannelId);
+  await sendDiscordWebhook(
+    `💡 **${member.name}** vừa nộp ý tưởng mới: **"${title.trim()}"**\n> ${description.trim().slice(0, 150)}`,
+    undefined,
+    channelWebhook,
+    'idea'
+  );
 
   revalidatePath("/");
   return { success: true, id: ideaId };
@@ -152,7 +158,13 @@ export async function approveIdeaAction(ideaId: string, durationDays: number, pr
     `Bạn đã được giao sản xuất ý tưởng "${row.title}" (Hạn: ${endIso})`
   );
 
-  await sendDiscordWebhook(`📋 Ý tưởng **"${row.title}"** đã được Core duyệt và giao cho **${producerEmail}** (Sản xuất: ${durationDays} ngày, hạn: ${endIso})`);
+  const channelWebhook = await getWebhookUrlForPlatformChannel(platformChannelId || row.platform_channel_id);
+  await sendDiscordWebhook(
+    `📋 Ý tưởng **"${row.title}"** đã được Core duyệt và giao cho **${producerEmail}** (Sản xuất: ${durationDays} ngày, hạn: ${endIso})`,
+    undefined,
+    channelWebhook,
+    'general'
+  );
 
   revalidatePath("/");
 }
@@ -187,7 +199,14 @@ export async function submitScriptAction(ideaId: string, scriptLink?: string) {
   );
 
   await recordAuditLog(ideaId, member.id, "Nộp kịch bản ASSIGNMENT -> SCRIPT", { scriptLink });
-  await sendDiscordWebhook(`📝 Producer **${member.name}** đã nộp kịch bản cho **"${row.title}"**. Chờ Editor sửa & duyệt.`);
+  
+  const channelWebhook = await getWebhookUrlForPlatformChannel(row.platform_channel_id);
+  await sendDiscordWebhook(
+    `📝 Producer **${member.name}** đã nộp kịch bản cho **"${row.title}"**. Chờ Editor sửa & duyệt.`,
+    undefined,
+    channelWebhook,
+    'general'
+  );
 
   // In-app notification for Editor and Core
   const editorCoreRows = await sql.query(`SELECT id FROM members WHERE role IN ('E', 'Core')`);
@@ -234,7 +253,13 @@ export async function startProductionAction(ideaId: string) {
     );
   }
 
-  await sendDiscordWebhook(`🎬 Kịch bản **"${row.title}"** đã được **${member.name}** duyệt — chính thức bước vào giai đoạn SẢN XUẤT.`);
+  const channelWebhook = await getWebhookUrlForPlatformChannel(row.platform_channel_id);
+  await sendDiscordWebhook(
+    `🎬 Kịch bản **"${row.title}"** đã được **${member.name}** duyệt — chính thức bước vào giai đoạn SẢN XUẤT.`,
+    undefined,
+    channelWebhook,
+    'general'
+  );
   revalidatePath("/");
 }
 
@@ -269,7 +294,13 @@ export async function submitVideoAction(ideaId: string, videoLink?: string) {
   );
 
   await recordAuditLog(ideaId, member.id, "Nộp video PRODUCTION -> QA", { videoLink });
-  await sendDiscordWebhook(`🎥 Producer **${member.name}** đã nộp video cho **"${row.title}"**. Chờ Ban đào tạo QA kiểm duyệt!`);
+  const channelWebhook = await getWebhookUrlForPlatformChannel(row.platform_channel_id);
+  await sendDiscordWebhook(
+    `🎥 Producer **${member.name}** đã nộp video cho **"${row.title}"**. Chờ Ban đào tạo QA kiểm duyệt!`,
+    undefined,
+    channelWebhook,
+    'general'
+  );
   revalidatePath("/");
 }
 
@@ -313,7 +344,13 @@ export async function qaPassAction(ideaId: string, publishedLink: string) {
     );
   }
 
-  await sendDiscordWebhook(`🎉 **HOÀN THÀNH SẢN PHẨM:** Ý tưởng **"${row.title}"** đã được duyệt QA và đăng tải thành công!\n🔗 Minh chứng: ${publishedLink.trim()}`);
+  const channelWebhook = await getWebhookUrlForPlatformChannel(row.platform_channel_id);
+  await sendDiscordWebhook(
+    `🎉 **HOÀN THÀNH SẢN PHẨM:** Ý tưởng **"${row.title}"** đã được duyệt QA và đăng tải thành công!\n🔗 Minh chứng: ${publishedLink.trim()}`,
+    undefined,
+    channelWebhook,
+    'general'
+  );
   revalidatePath("/");
 }
 
@@ -352,7 +389,13 @@ export async function qaFailAction(ideaId: string, qaFeedback: string) {
     );
   }
 
-  await sendDiscordWebhook(`⚠️ Video **"${row.title}"** chưa đạt QA bởi **${member.name}**.\n> Ghi chú sửa: ${qaFeedback.trim()}`);
+  const channelWebhook = await getWebhookUrlForPlatformChannel(row.platform_channel_id);
+  await sendDiscordWebhook(
+    `⚠️ Video **"${row.title}"** chưa đạt QA bởi **${member.name}**.\n> Ghi chú sửa: ${qaFeedback.trim()}`,
+    undefined,
+    channelWebhook,
+    'general'
+  );
   revalidatePath("/");
 }
 
@@ -609,8 +652,8 @@ export async function cloneIdeaAction(ideaId: string) {
     `INSERT INTO ideas (
       id, title, description, platform_channel_id, submitted_by_email,
       status, created_at, credits_idea_by_email, last_pitch_week, tags,
-      logline, reference_links, angle, key_message
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+      logline, reference_links, angle, key_message, content_pillar
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
     [
       newIdeaId,
       sourceRow.title + " (Copy)",
@@ -625,7 +668,8 @@ export async function cloneIdeaAction(ideaId: string) {
       sourceRow.logline || '',
       sourceRow.reference_links || '',
       sourceRow.angle || '',
-      sourceRow.key_message || ''
+      sourceRow.key_message || '',
+      sourceRow.content_pillar || ''
     ]
   );
 

@@ -82,7 +82,8 @@ export async function getAllData(): Promise<{
     archived: r.archived === true,
     description: r.description || '',
     referenceVideoLink: r.reference_video_link || '',
-    videoFormat: r.video_format || ''
+    videoFormat: r.video_format || '',
+    discordWebhookUrl: r.discord_webhook_url || ''
   }));
 
   const platformChannels: PlatformChannel[] = platformChannelsRows.map((r: any) => ({
@@ -167,9 +168,10 @@ export async function getAllData(): Promise<{
     createdByEmail: r.created_by_email || ''
   }));
 
-  const settings: AppSettings = { discordWebhookUrl: '', externalCalendarUrl: '' };
+  const settings: AppSettings = { discordWebhookUrl: '', discordIdeaWebhookUrl: '', externalCalendarUrl: '' };
   for (const r of (settingsRows as any[])) {
     if (r.key === 'discordWebhookUrl') settings.discordWebhookUrl = r.value || '';
+    if (r.key === 'discordIdeaWebhookUrl') settings.discordIdeaWebhookUrl = r.value || '';
     if (r.key === 'externalCalendarUrl') settings.externalCalendarUrl = r.value || '';
   }
 

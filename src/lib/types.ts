@@ -26,6 +26,7 @@ export interface ChannelGroup {
   description?: string;
   referenceVideoLink?: string;
   videoFormat?: string;
+  discordWebhookUrl?: string;
 }
 
 export interface PlatformChannel {
@@ -138,5 +139,6 @@ export interface ChecklistItem {
 
 export interface AppSettings {
   discordWebhookUrl: string;
+  discordIdeaWebhookUrl?: string;
   externalCalendarUrl: string;
 }

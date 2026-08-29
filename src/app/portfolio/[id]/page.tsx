@@ -1,4 +1,4 @@
-import { getAllData } from "../../../lib/sheets";
+import { getAllData } from "../../../lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Award, Lightbulb, ShieldCheck, PenLine, Scissors, Clapperboard, ExternalLink, ArrowLeft, CheckCircle2, Sparkles } from "lucide-react";

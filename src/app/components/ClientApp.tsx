@@ -334,11 +334,6 @@ function LoginScreen() {
     }
   }
 
-  const fillAccount = (email: string, pass: string = "123") => {
-    setEmailValue(email);
-    setPasswordValue(pass);
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-[#F8FAFC] text-[#0F172A] relative">
       <div className="w-full max-w-md p-8 rounded-2xl border border-[#E2E8F0] bg-white saas-shadow-lg relative z-10">
@@ -370,7 +365,7 @@ function LoginScreen() {
               required 
               value={emailValue}
               onChange={(e: any) => setEmailValue(e.target.value)}
-              placeholder="admin@ynda.vn hoặc producer1@ynda.vn" 
+              placeholder="Nhập email hoặc tên tài khoản..." 
               autoFocus 
             />
           </div>
@@ -391,31 +386,6 @@ function LoginScreen() {
             Vào Không Gian Làm Việc
           </Btn>
         </form>
-
-        {/* QUICK LOGIN PILLS */}
-        <div className="mt-6 pt-4 border-t border-slate-100 text-center">
-          <p className="text-[11px] text-[#64748B] mb-2">Tài khoản demo:</p>
-          <div className="flex flex-wrap items-center justify-center gap-1.5">
-            <button 
-              type="button" 
-              onClick={() => fillAccount("admin@ynda.vn")}
-              className="px-2.5 py-1 rounded-md text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors">
-              👑 admin@ynda.vn
-            </button>
-            <button 
-              type="button" 
-              onClick={() => fillAccount("producer1@ynda.vn")}
-              className="px-2.5 py-1 rounded-md text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors">
-              🎬 producer1@ynda.vn
-            </button>
-            <button 
-              type="button" 
-              onClick={() => fillAccount("editor1@ynda.vn")}
-              className="px-2.5 py-1 rounded-md text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors">
-              ✂️ editor1@ynda.vn
-            </button>
-          </div>
-        </div>
 
       </div>
     </div>
@@ -1693,17 +1663,24 @@ export default function ClientApp({
             e.preventDefault();
             const form = e.currentTarget;
             const discordWebhook = (form.elements.namedItem("discordWebhook") as HTMLInputElement).value;
+            const discordIdeaWebhook = (form.elements.namedItem("discordIdeaWebhook") as HTMLInputElement)?.value || "";
             const externalCalendar = (form.elements.namedItem("externalCalendar") as HTMLInputElement).value;
             
-            runAction(updateSettingsAction, discordWebhook, externalCalendar);
+            runAction(updateSettingsAction, discordWebhook, externalCalendar, discordIdeaWebhook);
             setShowSettingsModal(false);
             showToast("Đã lưu cài đặt");
           }}>
             <div className="space-y-3.5">
               <div>
-                <FieldLabel>Discord Webhook URL (Nhận thông báo & Báo cáo tuần)</FieldLabel>
-                <TextInput id="discordWebhook" defaultValue={settings.discordWebhookUrl} placeholder="https://discord.com/api/webhooks/..." />
-                <p className="text-[11px] text-[#64748B] mt-1">Thông báo tự động gửi về kênh Discord mỗi khi có Pitch mới, QA, hoặc báo cáo tuần.</p>
+                <FieldLabel>Discord Webhook Tổng (Giao việc, QA, Báo cáo tuần)</FieldLabel>
+                <TextInput id="discordWebhook" defaultValue={settings.discordWebhookUrl} placeholder="VD: Webhook kênh #📋-task-giao-việc-tổng..." />
+                <p className="text-[11px] text-[#64748B] mt-1">Dùng cho thông báo duyệt giao việc, nộp video, QA và báo cáo tổng hợp.</p>
+              </div>
+
+              <div>
+                <FieldLabel>Discord Webhook Ý Tưởng Mặc Định (Kênh #💡-ý-tưởng)</FieldLabel>
+                <TextInput id="discordIdeaWebhook" defaultValue={settings.discordIdeaWebhookUrl || ""} placeholder="VD: Webhook kênh #💡-ý-tưởng..." />
+                <p className="text-[11px] text-[#64748B] mt-1">Dùng để thông báo nộp idea mới và đợt Call Pitching (nếu kênh không có chủ đề riêng).</p>
               </div>
 
               <div>
@@ -1731,11 +1708,12 @@ export default function ClientApp({
             const description = (form.elements.namedItem("channelDescription") as HTMLTextAreaElement)?.value || "";
             const referenceVideoLink = (form.elements.namedItem("referenceVideoLink") as HTMLInputElement)?.value || "";
             const videoFormat = (form.elements.namedItem("videoFormat") as HTMLInputElement)?.value || "";
+            const discordWebhookUrl = (form.elements.namedItem("channelDiscordWebhook") as HTMLInputElement)?.value || "";
             const selectedPlatformIds = Array.from(
               (form.elements.namedItem("platformIds") as HTMLSelectElement).selectedOptions
             ).map(o => o.value);
             
-            runAction(createChannelGroupAction, name, color, selectedPlatformIds, description, referenceVideoLink, videoFormat);
+            runAction(createChannelGroupAction, name, color, selectedPlatformIds, description, referenceVideoLink, videoFormat, discordWebhookUrl);
             setShowNewChannel(false);
             showToast(`Đã tạo kênh "${name}"`);
           }}>
@@ -1769,6 +1747,12 @@ export default function ClientApp({
               </div>
 
               <div>
+                <FieldLabel>Link Chủ đề Discord (Thread) hoặc Webhook riêng cho Kênh</FieldLabel>
+                <TextInput id="channelDiscordWebhook" placeholder="VD: Link chủ đề Discord https://discord.com/channels/... hoặc ID Thread" />
+                <p className="text-[11px] text-slate-500 mt-1">Chuột phải vào Chủ đề trên Discord -> <b>Sao chép liên kết</b> rồi dán vào đây để bot tự gửi tin vào đúng chủ đề kênh này.</p>
+              </div>
+
+              <div>
                 <FieldLabel>Nền tảng phát hành (giữ Ctrl để chọn nhiều)</FieldLabel>
                 <select name="platformIds" multiple className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs bg-white text-slate-700 focus:outline-none focus:border-slate-900 min-h-[80px]">
                   {platforms.map((p: Platform) => (
@@ -1798,8 +1782,9 @@ export default function ClientApp({
             const description = (form.elements.namedItem("editChannelDescription") as HTMLTextAreaElement)?.value || "";
             const referenceVideoLink = (form.elements.namedItem("editReferenceVideoLink") as HTMLInputElement)?.value || "";
             const videoFormat = (form.elements.namedItem("editVideoFormat") as HTMLInputElement)?.value || "";
+            const discordWebhookUrl = (form.elements.namedItem("editChannelDiscordWebhook") as HTMLInputElement)?.value || "";
             
-            runAction(updateChannelGroupAction, editChannelTarget.id, name, color, description, referenceVideoLink, videoFormat);
+            runAction(updateChannelGroupAction, editChannelTarget.id, name, color, description, referenceVideoLink, videoFormat, discordWebhookUrl);
             setEditChannelTarget(null);
             showToast(`Đã cập nhật kênh "${name}"`);
           }}>
@@ -1830,6 +1815,12 @@ export default function ClientApp({
               <div>
                 <FieldLabel>Link video mẫu tham khảo (Reference Video)</FieldLabel>
                 <TextInput id="editReferenceVideoLink" defaultValue={editChannelTarget.referenceVideoLink || ""} placeholder="Link YouTube / TikTok video mẫu..." />
+              </div>
+
+              <div>
+                <FieldLabel>Link Chủ đề Discord (Thread) hoặc Webhook riêng cho Kênh</FieldLabel>
+                <TextInput id="editChannelDiscordWebhook" defaultValue={editChannelTarget.discordWebhookUrl || ""} placeholder="VD: Link chủ đề Discord https://discord.com/channels/... hoặc ID Thread" />
+                <p className="text-[11px] text-slate-500 mt-1">Chuột phải vào Chủ đề trên Discord -> <b>Sao chép liên kết</b> rồi dán vào đây để bot tự gửi tin vào đúng chủ đề kênh này.</p>
               </div>
             </div>
 
@@ -1996,7 +1987,7 @@ export default function ClientApp({
             const primaryExpertise = (form.elements.namedItem("memberPrimaryExpertise") as HTMLInputElement).value;
             const secondaryExpertise = (form.elements.namedItem("memberSecondaryExpertise") as HTMLInputElement).value;
             
-            runAction(createMemberAction, name, role, email, password || "123", phone, facebook, primaryExpertise, secondaryExpertise);
+            runAction(createMemberAction, name, role, email, password || undefined, phone, facebook, primaryExpertise, secondaryExpertise);
             setShowNewMember(false);
             showToast(`Đã thêm thành viên "${name}"`);
           }}>
@@ -2008,7 +1999,7 @@ export default function ClientApp({
                 </div>
                 <div>
                   <FieldLabel required>Email đăng nhập</FieldLabel>
-                  <TextInput id="memberEmail" type="email" required placeholder="a@ynda.vn" />
+                  <TextInput id="memberEmail" type="email" required placeholder="name@example.com" />
                 </div>
               </div>
 
@@ -2023,7 +2014,7 @@ export default function ClientApp({
                 </div>
                 <div>
                   <FieldLabel>Mật khẩu ban đầu</FieldLabel>
-                  <TextInput id="memberPassword" placeholder="Mặc định: 123" />
+                  <TextInput id="memberPassword" placeholder="Nhập mật khẩu (mặc định: 123456)" />
                 </div>
               </div>
 
@@ -3872,9 +3863,9 @@ function MembersAndAuditView({
   // DOWNLOAD TEMPLATE
   const handleDownloadTemplate = () => {
     const header = "Họ tên,Email,Vai trò,Mật khẩu,SĐT,Facebook,Chuyên môn chính,Chuyên môn phụ";
-    const example1 = '"Nguyễn Văn A","a@ynda.vn","P","123","0909000111","","Quay phim","Dựng phim"';
-    const example2 = '"Trần Thị B","b@ynda.vn","Editor","123","","","Biên tập",""';
-    const example3 = '"Lê Văn C","c@ynda.vn","Core","admin123","0909000333","https://facebook.com/levanc","Quản lý","Kịch bản"';
+    const example1 = '"Nguyễn Văn A","nguyenvana@example.com","P","123456","0909000111","","Quay phim","Dựng phim"';
+    const example2 = '"Trần Thị B","tranthib@example.com","Editor","123456","","","Biên tập",""';
+    const example3 = '"Lê Văn C","levanc@example.com","Core","123456","0909000333","https://facebook.com/levanc","Quản lý","Kịch bản"';
     const csv = "\uFEFF" + [header, example1, example2, example3].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -3930,7 +3921,7 @@ function MembersAndAuditView({
           name: cols[0] || '',
           email: cols[1] || '',
           role: cols[2] || 'P',
-          password: cols[3] || '123',
+          password: cols[3] || '123456',
           phone: cols[4] || '',
           facebook: cols[5] || '',
           primaryExpertise: cols[6] || '',
@@ -4087,10 +4078,10 @@ function MembersAndAuditView({
             <div className="text-slate-500 mb-1">// Dòng 1 (Header):</div>
             <div>Họ tên,Email,Vai trò,Mật khẩu,SĐT,Facebook,Chuyên môn chính,Chuyên môn phụ</div>
             <div className="text-slate-500 mt-2 mb-1">// Ví dụ dòng dữ liệu:</div>
-            <div>"Nguyễn Văn A","a@ynda.vn","P","123","0909000111","","Quay phim","Dựng phim"</div>
+            <div>"Nguyễn Văn A","nguyenvana@example.com","P","123456","0909000111","","Quay phim","Dựng phim"</div>
           </div>
           <p className="text-[11px] text-slate-500 mt-2">
-            <strong>Vai trò:</strong> Core, Editor (hoặc E), Producer (hoặc P). Mật khẩu mặc định là "123" nếu để trống.
+            <strong>Vai trò:</strong> Core, Editor (hoặc E), Producer (hoặc P). Mật khẩu mặc định là "123456" nếu để trống.
             File phải mã hóa <strong>UTF-8</strong> để hỗ trợ tiếng Việt.
           </p>
         </div>

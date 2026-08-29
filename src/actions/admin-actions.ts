@@ -4,6 +4,7 @@ import { getDb } from "../lib/db";
 import { getCurrentMember } from "./auth-actions";
 import { recordAuditLog } from "./audit-actions";
 import { revalidatePath } from "next/cache";
+import bcrypt from "bcryptjs";
 
 // -------------------------------------------------------------
 // PLATFORMS
@@ -55,7 +56,15 @@ export async function deletePlatformAction(platformId: string) {
 // -------------------------------------------------------------
 // CHANNEL GROUPS & PLATFORM CHANNELS
 // -------------------------------------------------------------
-export async function createChannelGroupAction(name: string, color: string, selectedPlatformIds: string[], description?: string, referenceVideoLink?: string, videoFormat?: string) {
+export async function createChannelGroupAction(
+  name: string, 
+  color: string, 
+  selectedPlatformIds: string[], 
+  description?: string, 
+  referenceVideoLink?: string, 
+  videoFormat?: string,
+  discordWebhookUrl?: string
+) {
   const member = await getCurrentMember();
   if (!member) throw new Error("Chưa đăng nhập");
   if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền tạo kênh");
@@ -66,9 +75,18 @@ export async function createChannelGroupAction(name: string, color: string, sele
   const channelGroupId = `cg_${Date.now().toString(36)}`;
 
   await sql.query(
-    `INSERT INTO channel_groups (id, name, color, archived, description, reference_video_link, video_format)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [channelGroupId, name.trim(), color || "#5B9EE8", false, description?.trim() || null, referenceVideoLink?.trim() || null, videoFormat?.trim() || null]
+    `INSERT INTO channel_groups (id, name, color, archived, description, reference_video_link, video_format, discord_webhook_url)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [
+      channelGroupId, 
+      name.trim(), 
+      color || "#5B9EE8", 
+      false, 
+      description?.trim() || null, 
+      referenceVideoLink?.trim() || null, 
+      videoFormat?.trim() || null,
+      discordWebhookUrl?.trim() || null
+    ]
   );
 
   // Automatically create PlatformChannels for selected platforms
@@ -89,7 +107,15 @@ export async function createChannelGroupAction(name: string, color: string, sele
   revalidatePath("/");
 }
 
-export async function updateChannelGroupAction(channelGroupId: string, name: string, color: string, description?: string, referenceVideoLink?: string, videoFormat?: string) {
+export async function updateChannelGroupAction(
+  channelGroupId: string, 
+  name: string, 
+  color: string, 
+  description?: string, 
+  referenceVideoLink?: string, 
+  videoFormat?: string,
+  discordWebhookUrl?: string
+) {
   const member = await getCurrentMember();
   if (!member) throw new Error("Chưa đăng nhập");
   if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền chỉnh sửa kênh");
@@ -99,9 +125,17 @@ export async function updateChannelGroupAction(channelGroupId: string, name: str
   const sql = getDb();
   await sql.query(
     `UPDATE channel_groups 
-     SET name = $1, color = $2, description = $3, reference_video_link = $4, video_format = $5 
-     WHERE id = $6`,
-    [name.trim(), color || "#5B9EE8", description?.trim() || null, referenceVideoLink?.trim() || null, videoFormat?.trim() || null, channelGroupId]
+     SET name = $1, color = $2, description = $3, reference_video_link = $4, video_format = $5, discord_webhook_url = $6 
+     WHERE id = $7`,
+    [
+      name.trim(), 
+      color || "#5B9EE8", 
+      description?.trim() || null, 
+      referenceVideoLink?.trim() || null, 
+      videoFormat?.trim() || null, 
+      discordWebhookUrl?.trim() || null,
+      channelGroupId
+    ]
   );
 
   await recordAuditLog('', member.id, "Cập nhật thông tin kênh", { channelGroupId, name });
@@ -184,6 +218,11 @@ export async function createMemberAction(
     throw new Error(`Email ${cleanEmail} đã tồn tại trong danh sách thành viên`);
   }
 
+  const rawPassword = (password && password.trim() !== "") 
+    ? password.trim() 
+    : ((phone && phone.trim() !== "") ? phone.trim() : "123456");
+  const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
   await sql.query(
     `INSERT INTO members (id, name, role, password, phone, facebook, primary_expertise, secondary_expertise, active)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
@@ -191,7 +230,7 @@ export async function createMemberAction(
       cleanEmail,
       name.trim(),
       role || "P",
-      password ? password.trim() : (phone ? phone.trim() : "123"),
+      hashedPassword,
       phone || "",
       facebook || "",
       primaryExpertise || "",
@@ -242,6 +281,11 @@ export async function bulkImportMembersAction(
     const role = validRoles.includes(row.role) ? row.role : "P";
     const mappedRole = role === "Editor" ? "E" : (role === "Producer" ? "P" : role);
 
+    const rawPass = (row.password && row.password.trim() !== '') 
+      ? row.password.trim() 
+      : ((row.phone && row.phone.trim() !== '') ? row.phone.trim() : "123456");
+    const hashedPass = await bcrypt.hash(rawPass, 10);
+
     await sql.query(
       `INSERT INTO members (id, name, role, password, phone, facebook, primary_expertise, secondary_expertise, active)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
@@ -249,7 +293,7 @@ export async function bulkImportMembersAction(
         cleanEmail,
         cleanName,
         mappedRole,
-        (row.password || '').trim() || "123",
+        hashedPass,
         row.phone || "",
         row.facebook || "",
         row.primaryExpertise || "",
@@ -295,7 +339,11 @@ export async function updateMemberProfileAction(
   const updatedPrimary = primaryExpertise !== undefined ? primaryExpertise : row.primary_expertise;
   const updatedSecondary = secondaryExpertise !== undefined ? secondaryExpertise : row.secondary_expertise;
   const updatedRole = (role && current.role === "Core") ? role : row.role;
-  const updatedPassword = (password && password.trim() !== "") ? password.trim() : row.password;
+  
+  let updatedPassword = row.password;
+  if (password && password.trim() !== "") {
+    updatedPassword = await bcrypt.hash(password.trim(), 10);
+  }
 
   await sql.query(
     `UPDATE members SET 
@@ -351,7 +399,7 @@ export async function removeMemberAction(memberEmailToRemove: string) {
 // -------------------------------------------------------------
 // SETTINGS
 // -------------------------------------------------------------
-export async function updateSettingsAction(discordWebhookUrl: string, externalCalendarUrl: string) {
+export async function updateSettingsAction(discordWebhookUrl: string, externalCalendarUrl: string, discordIdeaWebhookUrl?: string) {
   const current = await getCurrentMember();
   if (!current) throw new Error("Chưa đăng nhập");
   if (current.role !== "Core") throw new Error("Chỉ Core mới có quyền chỉnh sửa cấu hình hệ thống");
@@ -363,6 +411,14 @@ export async function updateSettingsAction(discordWebhookUrl: string, externalCa
       `INSERT INTO settings (key, value) VALUES ('discordWebhookUrl', $1)
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
       [discordWebhookUrl.trim()]
+    );
+  }
+
+  if (discordIdeaWebhookUrl !== undefined) {
+    await sql.query(
+      `INSERT INTO settings (key, value) VALUES ('discordIdeaWebhookUrl', $1)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [discordIdeaWebhookUrl.trim()]
     );
   }
 

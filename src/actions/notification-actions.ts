@@ -5,21 +5,94 @@ import { getCurrentMember } from "./auth-actions";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
 
-export async function sendDiscordWebhook(content: string, embeds?: any[]) {
-  try {
-    let webhookUrl = process.env.DISCORD_WEBHOOK_URL || "";
+function resolveWebhookWithThread(targetInput: string, fallbackBaseWebhook: string): string {
+  const input = (targetInput || '').trim();
+  if (!input) return fallbackBaseWebhook;
 
-    if (!webhookUrl) {
-      const sql = getDb();
-      const rows = await sql.query(`SELECT value FROM settings WHERE key = 'discordWebhookUrl' LIMIT 1`);
-      if (rows[0] && (rows[0] as any).value) {
-        webhookUrl = (rows[0] as any).value.trim();
+  // Case 1: Already a full webhook URL
+  if (input.startsWith('http://') || input.startsWith('https://')) {
+    if (input.includes('/api/webhooks/')) {
+      return input;
+    }
+
+    // Case 2: Discord Channel / Thread URL: https://discord.com/channels/GUILD_ID/CHANNEL_ID/THREAD_ID
+    const parts = input.split('?')[0].split('/').filter(Boolean);
+    const lastPart = parts[parts.length - 1];
+    if (/^\d{17,21}$/.test(lastPart)) {
+      const separator = fallbackBaseWebhook.includes('?') ? '&' : '?';
+      return `${fallbackBaseWebhook}${separator}thread_id=${lastPart}`;
+    }
+  }
+
+  // Case 3: Pure numeric thread ID
+  if (/^\d{17,21}$/.test(input)) {
+    const separator = fallbackBaseWebhook.includes('?') ? '&' : '?';
+    return `${fallbackBaseWebhook}${separator}thread_id=${input}`;
+  }
+
+  return fallbackBaseWebhook;
+}
+
+export async function getWebhookUrlForPlatformChannel(platformChannelId?: string): Promise<string | undefined> {
+  if (!platformChannelId) return undefined;
+  try {
+    const sql = getDb();
+    const rows = await sql.query(
+      `SELECT cg.discord_webhook_url 
+       FROM platform_channels pc 
+       JOIN channel_groups cg ON pc.channel_group_id = cg.id 
+       WHERE pc.id = $1 LIMIT 1`,
+      [platformChannelId]
+    );
+    return (rows[0] as any)?.discord_webhook_url?.trim() || undefined;
+  } catch (err) {
+    return undefined;
+  }
+}
+
+export async function getChannelGroupWebhookUrl(channelGroupId?: string): Promise<string | undefined> {
+  if (!channelGroupId) return undefined;
+  try {
+    const sql = getDb();
+    const rows = await sql.query(`SELECT discord_webhook_url FROM channel_groups WHERE id = $1 LIMIT 1`, [channelGroupId]);
+    return (rows[0] as any)?.discord_webhook_url?.trim() || undefined;
+  } catch (err) {
+    return undefined;
+  }
+}
+
+export async function sendDiscordWebhook(
+  content: string, 
+  embeds?: any[],
+  customTargetWebhookOrThread?: string,
+  category: 'general' | 'idea' = 'general'
+) {
+  try {
+    const sql = getDb();
+    let baseWebhookUrl = "";
+
+    if (category === 'idea') {
+      const ideaRows = await sql.query(`SELECT value FROM settings WHERE key = 'discordIdeaWebhookUrl' LIMIT 1`);
+      if (ideaRows[0] && (ideaRows[0] as any).value) {
+        baseWebhookUrl = (ideaRows[0] as any).value.trim();
       }
     }
 
-    if (!webhookUrl) return;
+    if (!baseWebhookUrl) {
+      baseWebhookUrl = process.env.DISCORD_WEBHOOK_URL || "";
+      if (!baseWebhookUrl) {
+        const rows = await sql.query(`SELECT value FROM settings WHERE key = 'discordWebhookUrl' LIMIT 1`);
+        if (rows[0] && (rows[0] as any).value) {
+          baseWebhookUrl = (rows[0] as any).value.trim();
+        }
+      }
+    }
 
-    await fetch(webhookUrl, {
+    if (!baseWebhookUrl) return;
+
+    const finalWebhookUrl = resolveWebhookWithThread(customTargetWebhookOrThread || '', baseWebhookUrl);
+
+    await fetch(finalWebhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

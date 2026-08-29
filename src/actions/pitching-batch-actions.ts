@@ -3,8 +3,7 @@
 import { getDb } from "../lib/db";
 import { getCurrentMember } from "./auth-actions";
 import { recordAuditLog } from "./audit-actions";
-import { createNotification } from "./notification-actions";
-import { sendDiscordWebhook } from "../lib/discord";
+import { createNotification, sendDiscordWebhook, getChannelGroupWebhookUrl } from "./notification-actions";
 import { revalidatePath } from "next/cache";
 
 export async function createPitchingBatchAction(
@@ -62,7 +61,8 @@ export async function createPitchingBatchAction(
   if (description?.trim()) discordMsg += `\n> 📝 **Yêu cầu nội dung:** ${description.trim()}`;
   if (exampleAngles?.trim()) discordMsg += `\n> 💡 **Ví dụ & Cách đào sâu:** ${exampleAngles.trim()}`;
 
-  await sendDiscordWebhook(discordMsg);
+  const channelWebhook = await getChannelGroupWebhookUrl(channelGroupId);
+  await sendDiscordWebhook(discordMsg, undefined, channelWebhook, 'idea');
 
   revalidatePath("/");
   return { success: true, id: batchId };

@@ -2,7 +2,7 @@
 
 import { getDb } from "../lib/db";
 import { getCurrentMember } from "./auth-actions";
-import { createNotification, sendDiscordWebhook } from "./notification-actions";
+import { createNotification, sendDiscordWebhook, getWebhookUrlForPlatformChannel } from "./notification-actions";
 import { recordAuditLog } from "./audit-actions";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
@@ -51,7 +51,13 @@ export async function addCommentAction(ideaId: string, content: string) {
   }
 
   // Optional Discord notification
-  await sendDiscordWebhook(`💬 **${member.name}** bình luận trên ý tưởng **${ideaTitle}**:\n> ${content.trim()}`);
+  const channelWebhook = await getWebhookUrlForPlatformChannel(ideaRow.platform_channel_id);
+  await sendDiscordWebhook(
+    `💬 **${member.name}** bình luận trên ý tưởng **${ideaTitle}**:\n> ${content.trim()}`,
+    undefined,
+    channelWebhook,
+    'general'
+  );
 
   revalidatePath("/");
   return { success: true, id: commentId };
