@@ -500,7 +500,9 @@ async function migrateFromGoogleSheets() {
 async function main() {
   try {
     await initSchema();
-    await migrateFromGoogleSheets();
+    if (process.env.MIGRATE_SHEETS === "true") {
+      await migrateFromGoogleSheets();
+    }
   } catch (err) {
     console.error("Migration failed:", err);
     process.exit(1);
