@@ -27,6 +27,7 @@ export async function getAllData(): Promise<{
   notifications: NotificationItem[];
   checklists: ChecklistItem[];
   settings: AppSettings;
+  pitchingBatches: PitchingBatch[];
 }> {
   const sql = getDb();
 
@@ -40,7 +41,8 @@ export async function getAllData(): Promise<{
     auditLogsRows,
     notificationsRows,
     checklistsRows,
-    settingsRows
+    settingsRows,
+    pitchingBatchesRows
   ] = await Promise.all([
     sql.query(`SELECT * FROM members ORDER BY name ASC`),
     sql.query(`SELECT * FROM platforms ORDER BY name ASC`),
@@ -51,7 +53,8 @@ export async function getAllData(): Promise<{
     sql.query(`SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT 500`),
     sql.query(`SELECT * FROM notifications ORDER BY created_at DESC LIMIT 500`),
     sql.query(`SELECT * FROM checklists ORDER BY id ASC`),
-    sql.query(`SELECT * FROM settings`)
+    sql.query(`SELECT * FROM settings`),
+    sql.query(`SELECT * FROM pitching_batches ORDER BY created_at DESC`)
   ]);
 
   const members: Member[] = membersRows.map((r: any) => ({
@@ -123,7 +126,8 @@ export async function getAllData(): Promise<{
     lastPitchWeek: r.last_pitch_week || '',
     internalNote: r.internal_note || '',
     rating: r.rating !== null && r.rating !== undefined ? parseFloat(r.rating) : undefined,
-    tags: r.tags || ''
+    tags: r.tags || '',
+    pitchingBatchId: r.pitching_batch_id || ''
   }));
 
   const comments: CommentItem[] = commentsRows.map((r: any) => ({
@@ -168,6 +172,17 @@ export async function getAllData(): Promise<{
     if (r.key === 'externalCalendarUrl') settings.externalCalendarUrl = r.value || '';
   }
 
+  const pitchingBatches: PitchingBatch[] = pitchingBatchesRows.map((r: any) => ({
+    id: r.id,
+    title: r.title || '',
+    description: r.description || '',
+    deadline: r.deadline || '',
+    channelGroupId: r.channel_group_id || '',
+    createdByEmail: r.created_by_email || '',
+    createdAt: r.created_at || new Date().toISOString(),
+    status: (r.status || 'OPEN') as any
+  }));
+
   return {
     members,
     platforms,
@@ -178,6 +193,7 @@ export async function getAllData(): Promise<{
     auditLogs,
     notifications,
     checklists,
-    settings
+    settings,
+    pitchingBatches
   };
 }

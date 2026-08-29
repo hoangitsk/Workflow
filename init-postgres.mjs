@@ -148,6 +148,19 @@ async function initSchema() {
     );
   `);
 
+  await sql.query(`
+    CREATE TABLE IF NOT EXISTS pitching_batches (
+      id VARCHAR(100) PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      deadline VARCHAR(100) NOT NULL,
+      channel_group_id VARCHAR(100),
+      created_by_email VARCHAR(255) NOT NULL,
+      created_at VARCHAR(100) NOT NULL,
+      status VARCHAR(50) NOT NULL DEFAULT 'OPEN'
+    );
+  `);
+
   // Add new columns if they don't exist
   try {
     await sql.query(`ALTER TABLE ideas ADD COLUMN logline TEXT;`);
@@ -160,6 +173,9 @@ async function initSchema() {
   } catch (e) { /* ignores if exists */ }
   try {
     await sql.query(`ALTER TABLE ideas ADD COLUMN key_message TEXT;`);
+  } catch (e) { /* ignores if exists */ }
+  try {
+    await sql.query(`ALTER TABLE ideas ADD COLUMN pitching_batch_id TEXT;`);
   } catch (e) { /* ignores if exists */ }
 
   try {

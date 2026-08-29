@@ -31,7 +31,8 @@ import { addCommentAction } from "../../actions/comment-actions";
 import { markNotificationAsReadAction, markAllNotificationsAsReadAction } from "../../actions/notification-actions";
 import { sendWeeklyReportToDiscordAction } from "../../actions/report-actions";
 import { createChecklistAction, updateChecklistStatusAction, deleteChecklistAction, updateChecklistDetailsAction } from "../../actions/checklist-actions";
-import { Member, Platform, ChannelGroup, PlatformChannel, Idea, CommentItem, AuditLogItem, NotificationItem, ChecklistItem, AppSettings, Role } from "../../lib/types";
+import { createPitchingBatchAction, closePitchingBatchAction } from "../../actions/pitching-batch-actions";
+import { Member, Platform, ChannelGroup, PlatformChannel, Idea, CommentItem, AuditLogItem, NotificationItem, ChecklistItem, AppSettings, PitchingBatch, Role } from "../../lib/types";
 
 /* ---------------------------------------------------------------------
    LIGHT WORKSPACE DESIGN TOKENS (CLEAN & MODERN SAAS)
@@ -426,6 +427,7 @@ interface ClientAppProps {
   initialNotifications: NotificationItem[];
   initialChecklists: ChecklistItem[];
   initialSettings: AppSettings;
+  initialPitchingBatches?: PitchingBatch[];
   currentMemberId: string | null;
 }
 
@@ -440,6 +442,7 @@ export default function ClientApp({
   initialNotifications,
   initialChecklists,
   initialSettings,
+  initialPitchingBatches,
   currentMemberId
 }: ClientAppProps) {
   const [isPending, startTransition] = useTransition();
@@ -460,6 +463,7 @@ export default function ClientApp({
   const notifications = initialNotifications || [];
   const checklists = initialChecklists || [];
   const settings = initialSettings || { discordWebhookUrl: '', externalCalendarUrl: '' };
+  const pitchingBatches = initialPitchingBatches || [];
 
   // Mobile sidebar toggle
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -470,6 +474,7 @@ export default function ClientApp({
   // Slide-over & Modals
   const [openIdea, setOpenIdea] = useState<Idea | null>(null);
   const [showNewIdea, setShowNewIdea] = useState(false);
+  const [showNewPitchingBatchModal, setShowNewPitchingBatchModal] = useState(false);
   const [approveIdeaTarget, setApproveIdeaTarget] = useState<Idea | null>(null);
   const [qaRejectIdeaTarget, setQaRejectIdeaTarget] = useState<Idea | null>(null);
   const [qaCompleteIdeaTarget, setQaCompleteIdeaTarget] = useState<Idea | null>(null);
@@ -996,7 +1001,11 @@ export default function ClientApp({
               )}
             </div>
 
-            {/* Primary Action Button: + Ý tưởng mới */}
+            {actor.role === "Core" && (
+              <Btn tone="default" onClick={() => setShowNewPitchingBatchModal(true)} small className="font-semibold !text-amber-800 !bg-amber-50 !border-amber-200 hover:!bg-amber-100 shadow-xs">
+                <Flame size={13} className="text-amber-500" /> + Đợt Call Pitching
+              </Btn>
+            )}
             <Btn tone="primary" onClick={() => setShowNewIdea(true)} small className="font-bold shadow-xs">
               <Plus size={13} /> Ý tưởng mới
             </Btn>
@@ -1011,6 +1020,7 @@ export default function ClientApp({
           {tab === "dashboard" && (
             <DashboardView 
               ideas={ideas}
+              pitchingBatches={pitchingBatches}
               channelGroupById={channelGroupById}
               platformById={platformById}
               pcById={pcById}
@@ -1024,12 +1034,14 @@ export default function ClientApp({
               onSubmitScript={setSubmitScriptTarget}
               onSubmitVideo={setSubmitVideoTarget}
               runAction={runAction}
+              showToast={showToast}
             />
           )}
 
           {tab === "board" && (
             <BoardView 
               ideas={ideas}
+              pitchingBatches={pitchingBatches}
               channelGroups={channelGroups}
               platforms={platforms}
               platformChannels={platformChannels}
@@ -1057,6 +1069,7 @@ export default function ClientApp({
               sortMode={sortMode}
               setSortMode={setSortMode}
               runAction={runAction}
+              showToast={showToast}
             />
           )}
 
@@ -1850,6 +1863,56 @@ export default function ClientApp({
         </Modal>
       )}
 
+      {/* NEW PITCHING BATCH MODAL */}
+      {showNewPitchingBatchModal && (
+        <Modal title="📢 Phát động Đợt Call Pitching Mới" onClose={() => setShowNewPitchingBatchModal(false)}>
+          <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
+            e.preventDefault();
+            const form = e.currentTarget;
+            const title = (form.elements.namedItem("batchTitle") as HTMLInputElement).value;
+            const description = (form.elements.namedItem("batchDescription") as HTMLTextAreaElement)?.value || "";
+            const deadline = (form.elements.namedItem("batchDeadline") as HTMLInputElement).value;
+            const channelGroupId = (form.elements.namedItem("batchChannelGroup") as HTMLSelectElement)?.value || "";
+            
+            runAction(createPitchingBatchAction, title, description, deadline, channelGroupId);
+            setShowNewPitchingBatchModal(false);
+            showToast(`Đã phát động đợt Call Pitching "${title}" & gửi thông báo lên nhóm!`);
+          }}>
+            <div className="space-y-3">
+              <div>
+                <FieldLabel required>Tiêu đề đợt Call Pitching</FieldLabel>
+                <TextInput id="batchTitle" autoFocus required placeholder="VD: Săn Idea Tuần 35 — Chủ đề Tâm Lý & Đời Sống" />
+              </div>
+
+              <div>
+                <FieldLabel required>Hạn chót nộp ý tưởng (Deadline)</FieldLabel>
+                <TextInput id="batchDeadline" required placeholder="VD: 23:59 ngày 31/08/2026" />
+              </div>
+
+              <div>
+                <FieldLabel>Yêu cầu & Định hướng nội dung đợt này</FieldLabel>
+                <TextArea id="batchDescription" rows={3} placeholder="Mô tả số lượng video cần nhận, chủ đề tập trung, phong cách mong muốn..." />
+              </div>
+
+              <div>
+                <FieldLabel>Kênh áp dụng (Tuỳ chọn)</FieldLabel>
+                <Select id="batchChannelGroup">
+                  <option value="">-- Tất cả các Kênh trong Studio --</option>
+                  {channelGroups.map(cg => (
+                    <option key={cg.id} value={cg.id}>{cg.name}</option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-slate-100">
+              <Btn onClick={() => setShowNewPitchingBatchModal(false)}>Huỷ</Btn>
+              <Btn tone="primary" type="submit" loading={isPending}>📢 Phát động & Gửi thông báo nhóm</Btn>
+            </div>
+          </form>
+        </Modal>
+      )}
+
       {/* ADD MEMBER MODAL */}
       {showNewMember && (
         <Modal title="Thêm thành viên mới vào Studio" onClose={() => setShowNewMember(false)}>
@@ -2154,6 +2217,7 @@ export default function ClientApp({
 --------------------------------------------------------------------- */
 function DashboardView({
   ideas,
+  pitchingBatches,
   channelGroupById,
   platformById,
   pcById,
@@ -2166,7 +2230,8 @@ function DashboardView({
   onQaReject,
   onSubmitScript,
   onSubmitVideo,
-  runAction
+  runAction,
+  showToast
 }: any) {
   // Tab Filter States for Unified Action List
   const [filterTab, setFilterTab] = useState<"ALL" | "PITCH" | "QA" | "MY_TASKS" | "OVERDUE">("ALL");
@@ -2210,9 +2275,51 @@ function DashboardView({
     "default": FileText
   };
 
+  const activeBatch = pitchingBatches?.find((b: PitchingBatch) => b.status === "OPEN");
+
   return (
     <div className="space-y-4">
       
+      {/* ACTIVE CALL PITCHING BANNER */}
+      {activeBatch && (
+        <div className="p-4 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white saas-shadow flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-1 max-w-2xl">
+            <div className="flex items-center gap-2">
+              <span className="bg-white/20 backdrop-blur-xs text-white font-bold text-[10px] uppercase px-2.5 py-0.5 rounded-full tracking-wider flex items-center gap-1">
+                <Flame size={12} className="text-amber-200 animate-pulse" /> Đợt Call Pitching Đang Mở
+              </span>
+              <span className="text-xs font-semibold bg-black/20 px-2.5 py-0.5 rounded-md text-amber-100 flex items-center gap-1">
+                <Clock size={12} /> Hạn chót: {activeBatch.deadline}
+              </span>
+            </div>
+            <h3 className="font-bold text-base text-white leading-tight">
+              {activeBatch.title}
+            </h3>
+            {activeBatch.description && (
+              <p className="text-xs text-amber-50/95 leading-relaxed line-clamp-2">
+                {activeBatch.description}
+              </p>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Btn small tone="default" className="!bg-white !text-amber-900 !border-white font-bold hover:!bg-amber-50 shadow-xs" onClick={onNewIdea}>
+              <Plus size={13} /> Nộp Ý Tưởng Cho Đợt Này
+            </Btn>
+            {actor.role === "Core" && (
+              <Btn small tone="danger" className="!bg-black/30 !text-white !border-white/20 hover:!bg-black/40" onClick={() => {
+                if (confirm(`Bạn có chắc muốn đóng đợt Call Pitching "${activeBatch.title}"?`)) {
+                  runAction(closePitchingBatchAction, activeBatch.id);
+                  showToast?.("Đã đóng đợt Call Pitching");
+                }
+              }}>
+                Đóng đợt
+              </Btn>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* HEADER ROW WITH ACTION */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
         <div>
@@ -2350,11 +2457,37 @@ function DashboardView({
                         <div className="font-medium text-[#0F172A] group-hover:text-[#4F46E5] transition-colors line-clamp-1 leading-snug">
                           {idea.title}
                         </div>
-                        {idea.description && (
+                        {idea.logline ? (
+                          <div className="text-[11px] text-amber-900 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60 truncate max-w-md mt-1 font-medium flex items-center gap-1.5">
+                            <span className="font-bold text-[9px] uppercase tracking-wider text-amber-700 bg-amber-100 px-1 rounded shrink-0">Logline</span>
+                            <span className="truncate">{idea.logline}</span>
+                          </div>
+                        ) : idea.description ? (
                           <div className="text-[11px] text-[#64748B] truncate max-w-md mt-0.5">
                             {idea.description}
                           </div>
+                        ) : null}
+
+                        {(idea.angle || idea.keyMessage || idea.referenceLinks) && (
+                          <div className="flex flex-wrap items-center gap-1 mt-1">
+                            {idea.angle && (
+                              <span className="text-[10px] text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100 font-medium truncate max-w-[180px]">
+                                <span className="font-bold">Angle:</span> {idea.angle}
+                              </span>
+                            )}
+                            {idea.keyMessage && (
+                              <span className="text-[10px] text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200 font-medium truncate max-w-[180px]">
+                                <span className="font-bold">Key Msg:</span> {idea.keyMessage}
+                              </span>
+                            )}
+                            {idea.referenceLinks && (
+                              <span className="text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100 font-medium inline-flex items-center gap-0.5">
+                                <LinkIcon size={9} /> Ref
+                              </span>
+                            )}
+                          </div>
                         )}
+
                         {idea.qaFeedback && (
                           <div className="mt-1 text-[10px] text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 inline-flex items-center gap-1 font-medium">
                             <AlertTriangle size={10} /> Yêu cầu sửa: {idea.qaFeedback}
@@ -3159,6 +3292,31 @@ function BoardView({
                       <h4 className="text-xs font-bold text-slate-900 leading-snug line-clamp-2">
                         {idea.title}
                       </h4>
+
+                      {idea.logline ? (
+                        <p className="text-[10px] text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/50 line-clamp-2 font-medium">
+                          <span className="font-bold text-amber-700">Logline:</span> "{idea.logline}"
+                        </p>
+                      ) : idea.description ? (
+                        <p className="text-[10px] text-slate-500 line-clamp-2">
+                          {idea.description}
+                        </p>
+                      ) : null}
+
+                      {(idea.angle || idea.referenceLinks) && (
+                        <div className="flex items-center gap-1">
+                          {idea.angle && (
+                            <span className="text-[9px] text-indigo-700 bg-indigo-50 px-1 py-0.2 rounded font-medium truncate max-w-[110px]">
+                              Angle: {idea.angle}
+                            </span>
+                          )}
+                          {idea.referenceLinks && (
+                            <span className="text-[9px] text-blue-700 bg-blue-50 px-1 py-0.2 rounded font-medium inline-flex items-center gap-0.5">
+                              <LinkIcon size={8} /> Ref
+                            </span>
+                          )}
+                        </div>
+                      )}
 
                       <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-500">
                         <div className="flex items-center gap-1">

@@ -1,4 +1,4 @@
-import { getAllData } from "../lib/sheets";
+import { getAllData } from "../lib/db";
 import { getCurrentMember } from "../actions/auth-actions";
 import ClientApp from "./components/ClientApp";
 
@@ -17,13 +17,14 @@ export default async function Page() {
     auditLogs: [],
     notifications: [],
     checklists: [],
-    settings: { discordWebhookUrl: '', externalCalendarUrl: '' }
+    settings: { discordWebhookUrl: '', externalCalendarUrl: '' },
+    pitchingBatches: []
   };
 
   try {
     initialData = await getAllData() as any;
   } catch (err) {
-    console.error("Lỗi nạp dữ liệu Google Sheets:", err);
+    console.error("Lỗi nạp dữ liệu Postgres:", err);
   }
 
   return (
@@ -38,6 +39,7 @@ export default async function Page() {
       initialNotifications={initialData.notifications}
       initialChecklists={initialData.checklists}
       initialSettings={initialData.settings}
+      initialPitchingBatches={initialData.pitchingBatches || []}
       currentMemberId={currentMember?.id || null}
     />
   );

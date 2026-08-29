@@ -83,6 +83,18 @@ export interface Idea {
   internalNote?: string;
   rating?: number;
   tags?: string;
+  pitchingBatchId?: string;
+}
+
+export interface PitchingBatch {
+  id: string;
+  title: string;
+  description?: string;
+  deadline: string;
+  channelGroupId?: string;
+  createdByEmail: string;
+  createdAt: string;
+  status: "OPEN" | "CLOSED";
 }
 
 export interface CommentItem {
