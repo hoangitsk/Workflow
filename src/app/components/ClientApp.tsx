@@ -24,7 +24,7 @@ import {
 } from "../../actions/idea-actions";
 import { 
   createChannelGroupAction, updateChannelGroupAction, archiveChannelGroupAction, restoreChannelGroupAction, 
-  createPlatformAction, createMemberAction, removeMemberAction, updateMemberProfileAction, 
+  createPlatformAction, deletePlatformAction, createMemberAction, removeMemberAction, updateMemberProfileAction, 
   toggleMemberActiveAction, updateSettingsAction, bulkImportMembersAction 
 } from "../../actions/admin-actions";
 import { addCommentAction } from "../../actions/comment-actions";
@@ -1780,23 +1780,59 @@ export default function ClientApp({
         </Modal>
       )}
 
-      {/* ADD PLATFORM MODAL */}
+      {/* PLATFORM MANAGER MODAL */}
       {showNewPlatform && (
-        <Modal title="Thêm Nền tảng phát hành mới" onClose={() => setShowNewPlatform(false)}>
-          <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
-            e.preventDefault();
-            const form = e.currentTarget;
-            const name = (form.elements.namedItem("platName") as HTMLInputElement).value;
-            const days = parseInt((form.elements.namedItem("platDays") as HTMLInputElement).value, 10);
-            
-            runAction(createPlatformAction, name, days);
-            setShowNewPlatform(false);
-            showToast(`Đã tạo nền tảng "${name}"`);
-          }}>
-            <div className="space-y-3">
+        <Modal title="Quản lý Nền tảng phát hành" onClose={() => setShowNewPlatform(false)}>
+          <div className="space-y-4">
+            {/* EXISTING PLATFORMS LIST */}
+            <div>
+              <FieldLabel>Danh sách Nền tảng hiện có ({platforms.length})</FieldLabel>
+              <div className="space-y-1.5 max-h-[180px] overflow-y-auto pr-1">
+                {platforms.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">Chưa có nền tảng nào.</p>
+                ) : (
+                  platforms.map((p: Platform) => (
+                    <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                      <div>
+                        <span className="font-semibold text-slate-800">{p.name}</span>
+                        <span className="text-slate-500 ml-2">({p.defaultDurationDays} ngày làm)</span>
+                      </div>
+                      {actor.role === "Core" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`Bạn có chắc muốn xoá nền tảng "${p.name}"?`)) {
+                              runAction(deletePlatformAction, p.id);
+                              showToast(`Đã xoá nền tảng "${p.name}"`);
+                            }
+                          }}
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                          title="Xoá nền tảng"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* ADD NEW PLATFORM FORM */}
+            <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
+              e.preventDefault();
+              const form = e.currentTarget;
+              const name = (form.elements.namedItem("platName") as HTMLInputElement).value;
+              const days = parseInt((form.elements.namedItem("platDays") as HTMLInputElement).value, 10);
+              
+              runAction(createPlatformAction, name, days);
+              (form.elements.namedItem("platName") as HTMLInputElement).value = "";
+              showToast(`Đã thêm nền tảng "${name}"`);
+            }} className="pt-3 border-t border-slate-200 space-y-3">
+              <span className="font-bold text-xs text-slate-900 uppercase tracking-wider block">Thêm Nền tảng mới</span>
               <div>
                 <FieldLabel required>Tên Nền tảng</FieldLabel>
-                <TextInput id="platName" autoFocus required placeholder="VD: TikTok, YouTube, Facebook Reels..." />
+                <TextInput id="platName" required placeholder="VD: TikTok, YouTube, Facebook Reels..." />
               </div>
 
               <div>
@@ -1804,13 +1840,13 @@ export default function ClientApp({
                 <TextInput id="platDays" type="number" min={1} max={30} defaultValue={2} required />
                 <p className="text-[11px] text-slate-500 mt-1">Số ngày mặc định để Producer hoàn thành video trên nền tảng này.</p>
               </div>
-            </div>
 
-            <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-slate-100">
-              <Btn onClick={() => setShowNewPlatform(false)}>Huỷ</Btn>
-              <Btn tone="primary" type="submit" loading={isPending}>Tạo Nền tảng</Btn>
-            </div>
-          </form>
+              <div className="flex justify-end gap-2 pt-2">
+                <Btn onClick={() => setShowNewPlatform(false)}>Đóng</Btn>
+                <Btn tone="primary" type="submit" loading={isPending}>+ Thêm Nền tảng</Btn>
+              </div>
+            </form>
+          </div>
         </Modal>
       )}
 

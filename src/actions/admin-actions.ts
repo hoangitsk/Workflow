@@ -28,6 +28,30 @@ export async function createPlatformAction(name: string, defaultDurationDays: nu
   revalidatePath("/");
 }
 
+export async function deletePlatformAction(platformId: string) {
+  const member = await getCurrentMember();
+  if (!member) throw new Error("Chưa đăng nhập");
+  if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền xoá nền tảng");
+
+  const sql = getDb();
+
+  // Check if any platform_channels exist for this platform
+  const pcRows = await sql.query(`SELECT id FROM platform_channels WHERE platform_id = $1`, [platformId]);
+  if (pcRows.length > 0) {
+    const pcIds = pcRows.map((r: any) => r.id);
+    const ideaCountRes = await sql.query(`SELECT COUNT(*) as count FROM ideas WHERE platform_channel_id = ANY($1)`, [pcIds]);
+    const ideaCount = parseInt(ideaCountRes[0]?.count || '0', 10);
+    if (ideaCount > 0) {
+      throw new Error(`Không thể xoá nền tảng này vì có ${ideaCount} ý tưởng đang sử dụng.`);
+    }
+    await sql.query(`DELETE FROM platform_channels WHERE platform_id = $1`, [platformId]);
+  }
+
+  await sql.query(`DELETE FROM platforms WHERE id = $1`, [platformId]);
+  await recordAuditLog('', member.id, "Xoá Nền tảng", { platformId });
+  revalidatePath("/");
+}
+
 // -------------------------------------------------------------
 // CHANNEL GROUPS & PLATFORM CHANNELS
 // -------------------------------------------------------------
