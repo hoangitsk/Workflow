@@ -78,13 +78,19 @@ export async function submitIdeaAction(
   // Audit log
   await recordAuditLog(ideaId, member.id, "Nộp ý tưởng mới", { title: title.trim(), description: description.trim() });
 
-  // Discord notification to channel thread / idea webhook
+  // Discord notification to channel thread / idea webhook and general task webhook
   const channelWebhook = await getWebhookUrlForPlatformChannel(platformChannelId);
+  let discordMsg = `💡 **${member.name}** vừa nộp ý tưởng Pitching mới: **"${title.trim()}"**`;
+  if (contentPillar) discordMsg += `\n> 🎯 **Tuyến bài:** ${contentPillar}`;
+  if (logline) discordMsg += `\n> 📝 **Logline:** ${logline}`;
+  if (description) discordMsg += `\n> 📄 **Mô tả:** ${description.trim().slice(0, 200)}${description.length > 200 ? '...' : ''}`;
+
   await sendDiscordWebhook(
-    `💡 **${member.name}** vừa nộp ý tưởng mới: **"${title.trim()}"**\n> ${description.trim().slice(0, 150)}`,
+    discordMsg,
     undefined,
     channelWebhook,
-    'idea'
+    'idea',
+    true
   );
 
   revalidatePath("/");

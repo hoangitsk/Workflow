@@ -74,9 +74,23 @@ export async function closePitchingBatchAction(batchId: string) {
   if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền đóng đợt Call Pitching");
 
   const sql = getDb();
+  const rows = await sql.query(`SELECT title, channel_group_id FROM pitching_batches WHERE id = $1 LIMIT 1`, [batchId]);
+  const batchTitle = (rows[0] as any)?.title || batchId;
+  const channelGroupId = (rows[0] as any)?.channel_group_id;
+
   await sql.query(`UPDATE pitching_batches SET status = 'CLOSED' WHERE id = $1`, [batchId]);
 
-  await recordAuditLog('', member.id, "Đóng đợt Call Pitching", { batchId });
+  await recordAuditLog('', member.id, "Đóng đợt Call Pitching", { batchId, title: batchTitle });
+
+  const channelWebhook = await getChannelGroupWebhookUrl(channelGroupId);
+  await sendDiscordWebhook(
+    `🔒 **ĐỢT CALL PITCHING ĐÃ ĐÓNG: "${batchTitle}"**\n> 🛑 Core Team đã đóng cổng nhận ý tưởng cho đợt này.`,
+    undefined,
+    channelWebhook,
+    'idea',
+    true
+  );
+
   revalidatePath("/");
 }
 
@@ -86,9 +100,24 @@ export async function reopenPitchingBatchAction(batchId: string) {
   if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền mở lại đợt Call Pitching");
 
   const sql = getDb();
+  const rows = await sql.query(`SELECT title, deadline, channel_group_id FROM pitching_batches WHERE id = $1 LIMIT 1`, [batchId]);
+  const batchTitle = (rows[0] as any)?.title || batchId;
+  const deadline = (rows[0] as any)?.deadline;
+  const channelGroupId = (rows[0] as any)?.channel_group_id;
+
   await sql.query(`UPDATE pitching_batches SET status = 'OPEN' WHERE id = $1`, [batchId]);
 
-  await recordAuditLog('', member.id, "Mở lại đợt Call Pitching", { batchId });
+  await recordAuditLog('', member.id, "Mở lại đợt Call Pitching", { batchId, title: batchTitle });
+
+  const channelWebhook = await getChannelGroupWebhookUrl(channelGroupId);
+  await sendDiscordWebhook(
+    `📢 **ĐỢT CALL PITCHING ĐÃ ĐƯỢC MỞ LẠI: "${batchTitle}"**${deadline ? `\n> ⏰ Hạn chót: ${deadline}` : ''}`,
+    undefined,
+    channelWebhook,
+    'idea',
+    true
+  );
+
   revalidatePath("/");
 }
 

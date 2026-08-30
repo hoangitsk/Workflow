@@ -65,41 +65,81 @@ export async function sendDiscordWebhook(
   content: string, 
   embeds?: any[],
   customTargetWebhookOrThread?: string,
-  category: 'general' | 'idea' = 'general'
+  category: 'general' | 'idea' = 'general',
+  sendToGeneralAlso: boolean = true
 ) {
   try {
     const sql = getDb();
-    let baseWebhookUrl = "";
+    
+    // Get general webhook (Kênh Task Giao Việc Tổng)
+    let generalWebhookUrl = process.env.DISCORD_WEBHOOK_URL || "";
+    if (!generalWebhookUrl) {
+      const rows = await sql.query(`SELECT value FROM settings WHERE key = 'discordWebhookUrl' LIMIT 1`);
+      if (rows[0] && (rows[0] as any).value) {
+        generalWebhookUrl = (rows[0] as any).value.trim();
+      }
+    }
+
+    // Get idea webhook (Kênh Ý tưởng)
+    let ideaWebhookUrl = "";
+    const ideaRows = await sql.query(`SELECT value FROM settings WHERE key = 'discordIdeaWebhookUrl' LIMIT 1`);
+    if (ideaRows[0] && (ideaRows[0] as any).value) {
+      ideaWebhookUrl = (ideaRows[0] as any).value.trim();
+    }
+
+    // Determine target URLs (deduplicated set)
+    const targetUrls = new Set<string>();
 
     if (category === 'idea') {
-      const ideaRows = await sql.query(`SELECT value FROM settings WHERE key = 'discordIdeaWebhookUrl' LIMIT 1`);
-      if (ideaRows[0] && (ideaRows[0] as any).value) {
-        baseWebhookUrl = (ideaRows[0] as any).value.trim();
+      // 1. If custom channel target is specified
+      if (customTargetWebhookOrThread) {
+        const resolved = resolveWebhookWithThread(customTargetWebhookOrThread, ideaWebhookUrl || generalWebhookUrl);
+        if (resolved) targetUrls.add(resolved);
+      }
+      
+      // 2. Add Idea Webhook if configured
+      if (ideaWebhookUrl) {
+        targetUrls.add(ideaWebhookUrl);
+      }
+
+      // 3. Also send to General Task Webhook (Task Giao Việc Tổng) so team gets notified in general task channel
+      if (sendToGeneralAlso && generalWebhookUrl) {
+        targetUrls.add(generalWebhookUrl);
+      }
+
+      // If neither is configured, fallback to general webhook
+      if (targetUrls.size === 0 && generalWebhookUrl) {
+        targetUrls.add(generalWebhookUrl);
+      }
+    } else {
+      // General category (tasks, script, video, QA, reports)
+      if (customTargetWebhookOrThread) {
+        const resolved = resolveWebhookWithThread(customTargetWebhookOrThread, generalWebhookUrl || ideaWebhookUrl);
+        if (resolved) targetUrls.add(resolved);
+      }
+      
+      if (generalWebhookUrl) {
+        targetUrls.add(generalWebhookUrl);
       }
     }
 
-    if (!baseWebhookUrl) {
-      baseWebhookUrl = process.env.DISCORD_WEBHOOK_URL || "";
-      if (!baseWebhookUrl) {
-        const rows = await sql.query(`SELECT value FROM settings WHERE key = 'discordWebhookUrl' LIMIT 1`);
-        if (rows[0] && (rows[0] as any).value) {
-          baseWebhookUrl = (rows[0] as any).value.trim();
-        }
-      }
-    }
+    if (targetUrls.size === 0) return;
 
-    if (!baseWebhookUrl) return;
-
-    const finalWebhookUrl = resolveWebhookWithThread(customTargetWebhookOrThread || '', baseWebhookUrl);
-
-    await fetch(finalWebhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        content,
-        embeds: embeds || []
-      })
+    // Send payload to all target webhooks
+    const payload = JSON.stringify({
+      content,
+      embeds: embeds || []
     });
+
+    await Promise.all(
+      Array.from(targetUrls).map(url =>
+        fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: payload
+        }).catch(err => console.error("Lỗi gửi webhook tới", url, err))
+      )
+    );
   } catch (err) {
     console.error("Lỗi gửi Discord Webhook:", err);
   }
