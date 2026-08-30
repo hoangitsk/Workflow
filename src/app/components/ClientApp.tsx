@@ -31,8 +31,9 @@ import { addCommentAction } from "../../actions/comment-actions";
 import { markNotificationAsReadAction, markAllNotificationsAsReadAction } from "../../actions/notification-actions";
 import { sendWeeklyReportToDiscordAction } from "../../actions/report-actions";
 import { createChecklistAction, updateChecklistStatusAction, deleteChecklistAction, updateChecklistDetailsAction } from "../../actions/checklist-actions";
-import { createPitchingBatchAction, closePitchingBatchAction } from "../../actions/pitching-batch-actions";
-import { Member, Platform, ChannelGroup, PlatformChannel, Idea, CommentItem, AuditLogItem, NotificationItem, ChecklistItem, AppSettings, PitchingBatch, Role } from "../../lib/types";
+import { createPitchingBatchAction, closePitchingBatchAction, reopenPitchingBatchAction, deletePitchingBatchAction } from "../../actions/pitching-batch-actions";
+import { Member, Platform, ChannelGroup, PlatformChannel, Idea, CommentItem, AuditLogItem, NotificationItem, ChecklistItem, AppSettings, PitchingBatch, Role, ReferenceItem, ReferenceType } from "../../lib/types";
+import { FormattedText, ReferenceList, MultiReferenceEditor, parseReferences } from "../../lib/reference-utils";
 
 /* ---------------------------------------------------------------------
    LIGHT WORKSPACE DESIGN TOKENS (CLEAN & MODERN SAAS)
@@ -238,23 +239,23 @@ function RoleChip({ role }: { role: string }) {
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div 
-        className="w-full flex flex-col rounded-xl border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 duration-150 overflow-hidden"
-        style={{ maxWidth: wide ? 760 : 480, maxHeight: "90vh" }}>
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50/80">
-          <h3 className="text-sm font-bold text-slate-900 tracking-wide flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-slate-900" />
-            {title}
+        className="w-full flex flex-col rounded-xl border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 duration-150 overflow-hidden max-h-[92vh]"
+        style={{ maxWidth: wide ? 760 : 480 }}>
+        <div className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-slate-50/80 shrink-0">
+          <h3 className="text-xs sm:text-sm font-bold text-slate-900 tracking-wide flex items-center gap-2 truncate pr-2">
+            <span className="w-2 h-2 rounded-full bg-slate-900 shrink-0" />
+            <span className="truncate">{title}</span>
           </h3>
           <button 
             onClick={onClose} 
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors">
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors shrink-0">
             <X size={16} />
           </button>
         </div>
-        <div className="px-5 py-4 overflow-y-auto">{children}</div>
+        <div className="px-4 py-3.5 sm:px-5 sm:py-4 overflow-y-auto">{children}</div>
       </div>
     </div>
   );
@@ -372,7 +373,7 @@ function Btn({ children, onClick, tone = "default", disabled, type = "button", s
       type={type} 
       onClick={onClick} 
       disabled={disabled || loading}
-      className={`inline-flex items-center justify-center gap-1.5 font-semibold rounded-lg transition-all select-none active:scale-[0.98] ${t.hover} ${small ? "px-2.5 py-1 text-xs" : "px-3.5 py-2 text-xs"} ${disabled || loading ? "opacity-40 cursor-not-allowed" : ""} ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 font-semibold rounded-lg transition-all select-none whitespace-nowrap shrink-0 active:scale-[0.98] ${t.hover} ${small ? "px-2.5 py-1 text-xs" : "px-3.5 py-2 text-xs"} ${disabled || loading ? "opacity-40 cursor-not-allowed" : ""} ${className}`}
       style={{ 
         background: t.bg, 
         color: t.fg, 
@@ -905,25 +906,27 @@ export default function ClientApp({
       <div className="flex-1 flex flex-col min-w-0 min-h-screen md:ml-0">
         
         {/* TOP HEADER (Height: 48px, Background: #FFFFFF) */}
-        <header className="h-12 sticky top-0 z-20 bg-white border-b border-[#E2E8F0] px-3 sm:px-5 flex items-center justify-between gap-2 sm:gap-4">
+        <header className="h-12 sticky top-0 z-20 bg-white border-b border-[#E2E8F0] px-2.5 sm:px-5 flex items-center justify-between gap-1.5 sm:gap-4">
           
-          {/* Mobile Hamburger */}
-          <button 
-            onClick={() => setSidebarOpen(true)}
-            className="md:hidden p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
-            aria-label="Mở menu">
-            <Menu size={18} />
-          </button>
+          {/* Mobile Hamburger & Breadcrumb */}
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <button 
+              onClick={() => setSidebarOpen(true)}
+              className="md:hidden p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
+              aria-label="Mở menu">
+              <Menu size={18} />
+            </button>
 
-          {/* Breadcrumb Navigation */}
-          <div className="flex items-center gap-1.5 text-xs text-[#64748B] min-w-0">
-            <span className="font-medium text-slate-500">Ý Niệm Điện Ảnh</span>
-            <ChevronRight size={13} className="text-slate-400" />
-            <span className="font-bold text-[#0F172A]">{activeTabTitle}</span>
+            {/* Breadcrumb Navigation */}
+            <div className="flex items-center gap-1.5 text-xs text-[#64748B] min-w-0">
+              <span className="font-medium text-slate-500 hidden sm:inline truncate">Ý Niệm Điện Ảnh</span>
+              <ChevronRight size={13} className="text-slate-400 hidden sm:inline shrink-0" />
+              <span className="font-bold text-[#0F172A] truncate text-xs sm:text-sm whitespace-nowrap">{activeTabTitle}</span>
+            </div>
           </div>
 
           {/* Search / Command Bar (Ctrl + K) */}
-          <div className="relative flex-1 max-w-sm hidden sm:block">
+          <div className="relative flex-1 max-w-sm hidden md:block">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               ref={searchInputRef}
@@ -994,9 +997,9 @@ export default function ClientApp({
           </div>
 
           {/* Header Right Actions */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {isPending && (
-              <span className="flex items-center gap-1 text-[11px] text-amber-700 font-mono">
+              <span className="hidden sm:flex items-center gap-1 text-[11px] text-amber-700 font-mono">
                 <RefreshCw size={11} className="animate-spin" /> Đồng bộ...
               </span>
             )}
@@ -1005,7 +1008,7 @@ export default function ClientApp({
             <div className="relative" ref={notificationsRef}>
               <button 
                 onClick={() => setShowNotificationsFlyout(!showNotificationsFlyout)}
-                className="relative p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors">
+                className="relative p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0">
                 <Bell size={16} />
                 {unreadNotifications.length > 0 && (
                   <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-rose-500 text-[9px] font-bold text-white flex items-center justify-center">
@@ -1017,7 +1020,7 @@ export default function ClientApp({
               {/* Notification Flyout */}
               {showNotificationsFlyout && (
                 <div 
-                  className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl p-3 z-50 animate-in fade-in zoom-in-95 duration-150 border border-slate-200 bg-white shadow-2xl">
+                  className="fixed sm:absolute top-12 sm:top-full right-2 sm:right-0 mt-1 w-[calc(100vw-16px)] sm:w-80 md:w-96 max-w-sm rounded-xl p-3 z-50 animate-in fade-in zoom-in-95 duration-150 border border-slate-200 bg-white shadow-2xl">
                   <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-100">
                     <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                       <Bell size={13} className="text-amber-600" />
@@ -1059,12 +1062,16 @@ export default function ClientApp({
             </div>
 
             {actor.role === "Core" && (
-              <Btn tone="default" onClick={() => setShowNewPitchingBatchModal(true)} small className="font-semibold !text-amber-800 !bg-amber-50 !border-amber-200 hover:!bg-amber-100 shadow-xs">
-                <Flame size={13} className="text-amber-500" /> + Đợt Call Pitching
+              <Btn tone="default" onClick={() => setShowNewPitchingBatchModal(true)} small className="font-semibold !text-amber-800 !bg-amber-50 !border-amber-200 hover:!bg-amber-100 shadow-xs px-2 sm:px-2.5">
+                <Flame size={13} className="text-amber-500 shrink-0" />
+                <span className="hidden sm:inline">+ Đợt Call Pitching</span>
+                <span className="sm:hidden text-[11px] font-semibold">+ Call</span>
               </Btn>
             )}
-            <Btn tone="primary" onClick={() => setShowNewIdea(true)} small className="font-bold shadow-xs">
-              <Plus size={13} /> Ý tưởng mới
+            <Btn tone="primary" onClick={() => setShowNewIdea(true)} small className="font-bold shadow-xs px-2 sm:px-2.5">
+              <Plus size={13} className="shrink-0" />
+              <span className="hidden sm:inline">Ý tưởng mới</span>
+              <span className="sm:hidden text-[11px] font-semibold">Ý tưởng</span>
             </Btn>
           </div>
 
@@ -1291,29 +1298,49 @@ export default function ClientApp({
           }}>
             <div className="space-y-3">
               {(() => {
-                const openBatch = pitchingBatches?.find((b: PitchingBatch) => b.status === "OPEN");
-                if (!openBatch) return null;
+                const openBatches = pitchingBatches?.filter((b: PitchingBatch) => b.status === "OPEN") || [];
+                if (openBatches.length === 0) return null;
                 return (
-                  <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-3 text-xs space-y-1.5 mb-1">
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="font-bold text-amber-900 flex items-center gap-1 uppercase tracking-wider text-[11px]">
-                        <Flame size={13} className="text-amber-500" /> Đợt Pitching Đang Mở: {openBatch.title}
-                      </span>
-                      {openBatch.category && (
-                        <span className="bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded text-[10px] font-bold shrink-0">
-                          🎯 {openBatch.category}
-                        </span>
-                      )}
+                  <div className="space-y-2 mb-2">
+                    <div className="text-[11px] font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <Flame size={13} className="text-amber-500 animate-pulse" /> Các đợt Call Pitching đang mở ({openBatches.length}):
                     </div>
-                    {openBatch.description && (
-                      <p className="text-slate-700"><span className="font-semibold text-slate-900">Yêu cầu:</span> {openBatch.description}</p>
-                    )}
-                    {openBatch.exampleAngles && (
-                      <div className="text-slate-700 bg-amber-100/60 p-2 rounded-lg border border-amber-200/60 text-[11px]">
-                        <span className="font-semibold text-amber-900 block mb-0.5">💡 Gợi ý đào sâu & Ví dụ từ Studio:</span>
-                        <span className="italic">{openBatch.exampleAngles}</span>
-                      </div>
-                    )}
+                    {openBatches.map((batch: PitchingBatch, idx: number) => {
+                      const ch = batch.channelGroupId ? channelGroupById[batch.channelGroupId] : null;
+                      return (
+                        <div key={batch.id || idx} className="bg-amber-50/90 border border-amber-200 rounded-xl p-3 text-xs space-y-1.5">
+                          <div className="flex items-center justify-between gap-1 flex-wrap">
+                            <span className="font-bold text-amber-900 flex items-center gap-1 text-[11.5px]">
+                              {openBatches.length > 1 ? `${idx + 1}. ` : ''}{batch.title}
+                            </span>
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {batch.category && (
+                                <span className="bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded text-[10px] font-bold shrink-0">
+                                  🎯 {batch.category}
+                                </span>
+                              )}
+                              {ch && (
+                                <span className="bg-slate-200/80 text-slate-800 px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0">
+                                  📺 {ch.name}
+                                </span>
+                              )}
+                              <span className="text-[10px] text-amber-800 font-mono bg-amber-100 px-1.5 py-0.5 rounded shrink-0">
+                                Hạn: {batch.deadline}
+                              </span>
+                            </div>
+                          </div>
+                          {batch.description && (
+                            <div className="text-slate-700 leading-snug"><span className="font-semibold text-slate-900">Yêu cầu:</span> <FormattedText text={batch.description} /></div>
+                          )}
+                          {batch.exampleAngles && (
+                            <div className="text-slate-700 bg-amber-100/60 p-2 rounded-lg border border-amber-200/60 text-[11px] leading-relaxed">
+                              <span className="font-semibold text-amber-900 block mb-0.5">💡 Gợi ý đào sâu & Ví dụ:</span>
+                              <span className="italic">{batch.exampleAngles}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })()}
@@ -1330,12 +1357,16 @@ export default function ClientApp({
 
               <div>
                 <FieldLabel required>Mô tả chi tiết nội dung (Content)</FieldLabel>
-                <TextArea id="description" required rows={3} placeholder="Chi tiết kịch bản dự kiến, các ý chính cần khai thác..." />
+                <TextArea id="description" required rows={3} placeholder="Chi tiết kịch bản dự kiến, các ý chính cần khai thác (hỗ trợ dán link ở bất kỳ đâu trong mô tả)..." />
               </div>
 
               <div>
-                <FieldLabel>Link tham khảo (Reference)</FieldLabel>
-                <TextInput id="referenceLinks" placeholder="Link video mẫu, bài viết, nhạc nền..." />
+                <MultiReferenceEditor 
+                  id="referenceLinks" 
+                  label="Link tham khảo của Ý tưởng (Reference)" 
+                  helperText="Có thể thêm 2-3 hoặc nhiều link tham khảo (Video mẫu, Docs kịch bản, Drive, Nhạc, Moodboard...)"
+                  placeholder="Link video mẫu, bài viết, nhạc nền, tài liệu..." 
+                />
               </div>
 
               <div>
@@ -1384,24 +1415,24 @@ export default function ClientApp({
                   if (!currentCh) return null;
                   if (!currentCh.description && !currentCh.videoFormat && !currentCh.referenceVideoLink) return null;
                   return (
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1.5 mt-2.5">
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-2 mt-2.5">
                       <div className="flex items-center gap-1.5 text-slate-800 font-semibold text-[11px] uppercase tracking-wider">
                         <Sparkles size={13} className="text-amber-500 shrink-0" />
                         <span>Định hướng & Reference Kênh: {currentCh.name}</span>
                       </div>
                       {currentCh.description && (
-                        <p className="text-slate-700 leading-relaxed"><span className="font-semibold text-slate-900">Mô tả định hướng:</span> {currentCh.description}</p>
+                        <div className="text-slate-700 leading-relaxed">
+                          <span className="font-semibold text-slate-900">Mô tả định hướng:</span>{" "}
+                          <FormattedText text={currentCh.description} />
+                        </div>
                       )}
                       {currentCh.videoFormat && (
                         <p className="text-slate-700"><span className="font-semibold text-slate-900">Dạng video làm:</span> {currentCh.videoFormat}</p>
                       )}
                       {currentCh.referenceVideoLink && (
-                        <p className="text-slate-700 break-words">
-                          <span className="font-semibold text-slate-900">Video mẫu tham khảo:</span>{" "}
-                          <a href={currentCh.referenceVideoLink} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
-                            {currentCh.referenceVideoLink} <ExternalLink size={11} />
-                          </a>
-                        </p>
+                        <div className="pt-1">
+                          <ReferenceList references={currentCh.referenceVideoLink} title="Tài liệu & Video tham khảo Kênh" />
+                        </div>
                       )}
                     </div>
                   );
@@ -1811,7 +1842,8 @@ export default function ClientApp({
 
               <div>
                 <FieldLabel>Mô tả định hướng nội dung của Kênh</FieldLabel>
-                <TextArea id="channelDescription" rows={3} placeholder="VD: Kênh phân tích tâm lý xã hội, văn học & phản biện hành vi nhân vật trong phim ảnh..." />
+                <TextArea id="channelDescription" rows={3} placeholder="Mô tả phong cách, đối tượng khán giả, chủ đề chính... Dán link tham khảo hoặc tài liệu ở bất kỳ đâu trong mô tả" />
+                <p className="text-[11px] text-slate-500 mt-1">💡 Có thể dán link trực tiếp ở bất kỳ đâu trong mô tả, hệ thống sẽ tự nhận diện và hiển thị link có thể click được.</p>
               </div>
 
               <div>
@@ -1820,8 +1852,11 @@ export default function ClientApp({
               </div>
 
               <div>
-                <FieldLabel>Link video mẫu tham khảo (Reference Video)</FieldLabel>
-                <TextInput id="referenceVideoLink" placeholder="Link YouTube/TikTok mẫu để team tham khảo định hướng..." />
+                <MultiReferenceEditor 
+                  id="referenceVideoLink" 
+                  label="Tài liệu & Video tham khảo Kênh (Reference)" 
+                  helperText="Thêm không giới hạn reference (2-3+ link) với nhiều định dạng: Video mẫu YouTube/TikTok, Tài liệu Google Docs/Notion, Drive, Nhạc nền, Moodboard..." 
+                />
               </div>
 
               <div>
@@ -1882,7 +1917,8 @@ export default function ClientApp({
 
               <div>
                 <FieldLabel>Mô tả định hướng nội dung của Kênh</FieldLabel>
-                <TextArea id="editChannelDescription" rows={3} defaultValue={editChannelTarget.description || ""} placeholder="Mô tả phong cách, đối tượng khán giả, chủ đề chính..." />
+                <TextArea id="editChannelDescription" rows={3} defaultValue={editChannelTarget.description || ""} placeholder="Mô tả phong cách, đối tượng khán giả, chủ đề chính... Dán link tham khảo hoặc tài liệu ở bất kỳ đâu trong mô tả" />
+                <p className="text-[11px] text-slate-500 mt-1">💡 Có thể dán link trực tiếp ở bất kỳ đâu trong mô tả, hệ thống sẽ tự nhận diện và hiển thị link có thể click được.</p>
               </div>
 
               <div>
@@ -1891,8 +1927,12 @@ export default function ClientApp({
               </div>
 
               <div>
-                <FieldLabel>Link video mẫu tham khảo (Reference Video)</FieldLabel>
-                <TextInput id="editReferenceVideoLink" defaultValue={editChannelTarget.referenceVideoLink || ""} placeholder="Link YouTube / TikTok video mẫu..." />
+                <MultiReferenceEditor 
+                  id="editReferenceVideoLink" 
+                  defaultValue={editChannelTarget.referenceVideoLink}
+                  label="Tài liệu & Video tham khảo Kênh (Reference)" 
+                  helperText="Thêm không giới hạn reference (2-3+ link) với nhiều định dạng: Video mẫu YouTube/TikTok, Tài liệu Google Docs/Notion, Drive, Nhạc nền, Moodboard..." 
+                />
               </div>
 
               <div>
@@ -2304,11 +2344,16 @@ export default function ClientApp({
               </div>
               <div>
                 <FieldLabel>Mô tả chi tiết</FieldLabel>
-                <TextArea id="editIdeaDescription" rows={3} defaultValue={editIdeaTarget.description || ""} placeholder="Chi tiết kịch bản dự kiến, các ý chính cần khai thác..." />
+                <TextArea id="editIdeaDescription" rows={3} defaultValue={editIdeaTarget.description || ""} placeholder="Chi tiết kịch bản dự kiến, các ý chính cần khai thác (hỗ trợ dán link ở bất kỳ đâu trong mô tả)..." />
               </div>
               <div>
-                <FieldLabel>Link tham khảo (Reference)</FieldLabel>
-                <TextInput id="editReferenceLinks" defaultValue={editIdeaTarget.referenceLinks || ""} placeholder="Link video mẫu, bài viết, nhạc nền..." />
+                <MultiReferenceEditor 
+                  id="editReferenceLinks" 
+                  defaultValue={editIdeaTarget.referenceLinks} 
+                  label="Link tham khảo của Ý tưởng (Reference)" 
+                  helperText="Có thể thêm 2-3 hoặc nhiều link tham khảo (Video mẫu, Docs kịch bản, Drive, Nhạc, Moodboard...)"
+                  placeholder="Link video mẫu, bài viết, nhạc nền, tài liệu..." 
+                />
               </div>
               <div>
                 <FieldLabel>Hướng triển khai (Angle)</FieldLabel>
@@ -2432,59 +2477,134 @@ function DashboardView({
     "default": FileText
   };
 
-  const activeBatch = pitchingBatches?.find((b: PitchingBatch) => b.status === "OPEN");
+  const openBatches = pitchingBatches?.filter((b: PitchingBatch) => b.status === "OPEN") || [];
+  const closedBatches = pitchingBatches?.filter((b: PitchingBatch) => b.status !== "OPEN") || [];
+  const [showClosedBatches, setShowClosedBatches] = useState(false);
 
   return (
     <div className="space-y-4">
       
-      {/* ACTIVE CALL PITCHING BANNER */}
-      {activeBatch && (
-        <div className="p-4 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white saas-shadow flex flex-wrap items-center justify-between gap-3">
-          <div className="space-y-1.5 max-w-2xl">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="bg-white/20 backdrop-blur-xs text-white font-bold text-[10px] uppercase px-2.5 py-0.5 rounded-full tracking-wider flex items-center gap-1">
-                <Flame size={12} className="text-amber-200 animate-pulse" /> Đợt Call Pitching Đang Mở
-              </span>
-              {activeBatch.category && (
-                <span className="bg-amber-900/30 text-amber-100 font-bold text-[10px] uppercase px-2 py-0.5 rounded-md border border-amber-200/30">
-                  🎯 {activeBatch.category}
-                </span>
-              )}
-              <span className="text-xs font-semibold bg-black/20 px-2.5 py-0.5 rounded-md text-amber-100 flex items-center gap-1">
-                <Clock size={12} /> Hạn chót: {activeBatch.deadline}
-              </span>
-            </div>
-            <h3 className="font-bold text-base text-white leading-tight">
-              {activeBatch.title}
-            </h3>
-            {activeBatch.description && (
-              <p className="text-xs text-amber-50/95 leading-relaxed">
-                <span className="font-semibold text-white">Yêu cầu:</span> {activeBatch.description}
-              </p>
-            )}
-            {activeBatch.exampleAngles && (
-              <div className="text-xs bg-black/20 p-2 rounded-lg border border-white/10 text-amber-100 leading-relaxed">
-                <span className="font-semibold text-white block text-[11px] uppercase tracking-wider mb-0.5">💡 Gợi ý & Ví dụ cách đào sâu:</span>
-                <span className="italic">{activeBatch.exampleAngles}</span>
-              </div>
-            )}
-          </div>
+      {/* ACTIVE CALL PITCHING BANNERS (RENDER ALL OPEN BATCHES) */}
+      {openBatches.length > 0 && (
+        <div className="space-y-3">
+          {openBatches.map((batch: PitchingBatch, idx: number) => {
+            const ch = batch.channelGroupId ? channelGroupById[batch.channelGroupId] : null;
+            return (
+              <div 
+                key={batch.id || idx}
+                className="p-4 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white saas-shadow flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+                <div className="space-y-1.5 max-w-2xl flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    <span className="bg-white/20 backdrop-blur-xs text-white font-bold text-[10px] uppercase px-2.5 py-0.5 rounded-full tracking-wider flex items-center gap-1">
+                      <Flame size={12} className="text-amber-200 animate-pulse" /> Đợt Call Pitching Đang Mở {openBatches.length > 1 ? `#${idx + 1}` : ''}
+                    </span>
+                    {batch.category && (
+                      <span className="bg-amber-900/40 text-amber-100 font-bold text-[10px] uppercase px-2 py-0.5 rounded-md border border-amber-200/30">
+                        🎯 {batch.category}
+                      </span>
+                    )}
+                    {ch && (
+                      <span className="bg-black/30 text-white font-semibold text-[10px] px-2 py-0.5 rounded-md border border-white/20">
+                        📺 Kênh: {ch.name}
+                      </span>
+                    )}
+                    <span className="text-xs font-semibold bg-black/20 px-2.5 py-0.5 rounded-md text-amber-100 flex items-center gap-1">
+                      <Clock size={12} /> Hạn chót: {batch.deadline}
+                    </span>
+                  </div>
 
-          <div className="flex items-center gap-2">
-            <Btn small tone="default" className="!bg-white !text-amber-900 !border-white font-bold hover:!bg-amber-50 shadow-xs" onClick={onNewIdea}>
-              <Plus size={13} /> Nộp Ý Tưởng Cho Đợt Này
-            </Btn>
-            {actor.role === "Core" && (
-              <Btn small tone="danger" className="!bg-black/30 !text-white !border-white/20 hover:!bg-black/40" onClick={() => {
-                if (confirm(`Bạn có chắc muốn đóng đợt Call Pitching "${activeBatch.title}"?`)) {
-                  runAction(closePitchingBatchAction, activeBatch.id);
-                  showToast?.("Đã đóng đợt Call Pitching");
-                }
-              }}>
-                Đóng đợt
-              </Btn>
-            )}
-          </div>
+                  <h3 className="font-bold text-base text-white leading-tight">
+                    {batch.title}
+                  </h3>
+
+                  {batch.description && (
+                    <div className="text-xs text-amber-50/95 leading-relaxed">
+                      <span className="font-semibold text-white">Yêu cầu:</span> <FormattedText text={batch.description} />
+                    </div>
+                  )}
+
+                  {batch.exampleAngles && (
+                    <div className="text-xs bg-black/20 p-2 rounded-lg border border-white/10 text-amber-100 leading-relaxed">
+                      <span className="font-semibold text-white block text-[11px] uppercase tracking-wider mb-0.5">💡 Gợi ý & Ví dụ cách đào sâu:</span>
+                      <span className="italic">{batch.exampleAngles}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-start sm:self-center flex-wrap">
+                  <Btn small tone="default" className="!bg-white !text-amber-900 !border-white font-bold hover:!bg-amber-50 shadow-xs" onClick={onNewIdea}>
+                    <Plus size={13} /> Nộp Ý Tưởng Cho Đợt Này
+                  </Btn>
+                  {actor.role === "Core" && (
+                    <Btn small tone="danger" className="!bg-black/30 !text-white !border-white/20 hover:!bg-black/40" onClick={() => {
+                      if (confirm(`Bạn có chắc muốn đóng đợt Call Pitching "${batch.title}"?`)) {
+                        runAction(closePitchingBatchAction, batch.id);
+                        showToast?.("Đã đóng đợt Call Pitching");
+                      }
+                    }}>
+                      Đóng đợt
+                    </Btn>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* CLOSED / HISTORICAL BATCHES ACCORDION */}
+      {closedBatches.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs">
+          <button 
+            onClick={() => setShowClosedBatches(!showClosedBatches)}
+            className="w-full flex items-center justify-between text-slate-700 hover:text-slate-900 font-semibold cursor-pointer">
+            <span className="flex items-center gap-2">
+              <Clock size={14} className="text-slate-400" />
+              Lịch sử các đợt Call Pitching đã đóng ({closedBatches.length})
+            </span>
+            <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${showClosedBatches ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showClosedBatches && (
+            <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
+              {closedBatches.map((b: PitchingBatch) => {
+                const ch = b.channelGroupId ? channelGroupById[b.channelGroupId] : null;
+                return (
+                  <div key={b.id} className="p-3 rounded-lg bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-bold text-slate-500 bg-slate-200/80 px-2 py-0.5 rounded uppercase">Đã đóng</span>
+                        {b.category && <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">🎯 {b.category}</span>}
+                        {ch && <span className="text-[10px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded">📺 Kênh: {ch.name}</span>}
+                        <span className="text-[10px] text-slate-400 font-mono">Hạn chót: {b.deadline}</span>
+                      </div>
+                      <div className="font-semibold text-slate-900 text-xs">{b.title}</div>
+                      {b.description && <div className="text-[11px] text-slate-600 line-clamp-1">{b.description}</div>}
+                    </div>
+
+                    {actor.role === "Core" && (
+                      <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-center">
+                        <Btn small tone="default" onClick={() => {
+                          runAction(reopenPitchingBatchAction, b.id);
+                          showToast?.("Đã mở lại đợt Call Pitching");
+                        }}>
+                          <RotateCcw size={11} /> Mở lại
+                        </Btn>
+                        <Btn small tone="danger" onClick={() => {
+                          if (confirm(`Bạn có chắc muốn xoá vĩnh viễn đợt Call Pitching "${b.title}"?`)) {
+                            runAction(deletePitchingBatchAction, b.id);
+                            showToast?.("Đã xoá đợt Call Pitching");
+                          }
+                        }}>
+                          <Trash2 size={11} /> Xoá
+                        </Btn>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -2501,55 +2621,55 @@ function DashboardView({
       </div>
 
       {/* FILTER TABS (DYNAMIC COUNTS) */}
-      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar border-b border-slate-200 pb-2">
+      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar border-b border-slate-200 pb-2 -mx-1 px-1 sm:mx-0 sm:px-0">
         <button
           onClick={() => setFilterTab("ALL")}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 whitespace-nowrap transition-all ${
             filterTab === "ALL" 
               ? "bg-slate-900 text-white shadow-xs" 
               : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
           }`}>
           <span>Tất cả</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${filterTab === "ALL" ? "bg-slate-700 text-slate-200" : "bg-slate-100 text-slate-600"}`}>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] shrink-0 ${filterTab === "ALL" ? "bg-slate-700 text-slate-200" : "bg-slate-100 text-slate-600"}`}>
             {ideas.filter((i: Idea) => i.status !== "ARCHIVED_IDEA" && i.status !== "CANCELLED").length}
           </span>
         </button>
 
         <button
           onClick={() => setFilterTab("PITCH")}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 whitespace-nowrap transition-all ${
             filterTab === "PITCH" 
               ? "bg-slate-900 text-white shadow-xs" 
               : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
           }`}>
           <span>Cần duyệt Pitch</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${filterTab === "PITCH" ? "bg-slate-700 text-slate-200" : "bg-amber-100 text-amber-800"}`}>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] shrink-0 ${filterTab === "PITCH" ? "bg-slate-700 text-slate-200" : "bg-amber-100 text-amber-800"}`}>
             {pendingPitchIdeas.length}
           </span>
         </button>
 
         <button
           onClick={() => setFilterTab("QA")}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 whitespace-nowrap transition-all ${
             filterTab === "QA" 
               ? "bg-slate-900 text-white shadow-xs" 
               : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
           }`}>
           <span>Chờ duyệt QA</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${filterTab === "QA" ? "bg-slate-700 text-slate-200" : "bg-rose-100 text-rose-800"}`}>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] shrink-0 ${filterTab === "QA" ? "bg-slate-700 text-slate-200" : "bg-rose-100 text-rose-800"}`}>
             {pendingQaIdeas.length}
           </span>
         </button>
 
         <button
           onClick={() => setFilterTab("MY_TASKS")}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 whitespace-nowrap transition-all ${
             filterTab === "MY_TASKS" 
               ? "bg-slate-900 text-white shadow-xs" 
               : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
           }`}>
           <span>Nhiệm vụ trực tiếp</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${filterTab === "MY_TASKS" ? "bg-slate-700 text-slate-200" : "bg-blue-100 text-blue-800"}`}>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] shrink-0 ${filterTab === "MY_TASKS" ? "bg-slate-700 text-slate-200" : "bg-blue-100 text-blue-800"}`}>
             {myTasks.length}
           </span>
         </button>
@@ -2557,22 +2677,178 @@ function DashboardView({
         {overdueIdeas.length > 0 && (
           <button
             onClick={() => setFilterTab("OVERDUE")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 whitespace-nowrap transition-all ${
               filterTab === "OVERDUE" 
                 ? "bg-rose-700 text-white shadow-xs" 
                 : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200"
             }`}>
             <span>Quá hạn</span>
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-200 text-rose-900">
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] shrink-0 bg-rose-200 text-rose-900">
               {overdueIdeas.length}
             </span>
           </button>
         )}
       </div>
 
-      {/* DATA TABLE CONTAINER */}
-      <div className="bg-white border border-[#E2E8F0] rounded-xl saas-shadow overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* MOBILE CARD LIST VIEW (sm:hidden) */}
+      <div className="sm:hidden space-y-2.5">
+        {displayIdeas.length === 0 ? (
+          <div className="py-8 px-4 text-center bg-white rounded-xl border border-slate-200 space-y-1.5">
+            <Inbox className="w-8 h-8 text-slate-300 mx-auto" />
+            <div className="text-xs font-semibold text-slate-700">Chưa có công việc nào chờ xử lý</div>
+            <p className="text-[11px] text-slate-400">Tất cả các đầu việc trong mục này đã hoàn tất.</p>
+          </div>
+        ) : (
+          displayIdeas.map((idea: Idea) => {
+            const od = overdueInfo(idea);
+            const pc = pcById[idea.platformChannelId];
+            const ch = pc ? channelGroupById[pc.channelGroupId] : null;
+            const pl = pc ? platformById[pc.platformId] : null;
+            const assignee = memberById[idea.assignedToEmail];
+            const submitter = memberById[idea.submittedByEmail];
+            const Icon = (pl && FORMAT_ICONS[pl.name]) || Film;
+            const statusStyle = STATUS_COLORS[idea.status] || STATUS_COLORS.PITCH;
+
+            return (
+              <div
+                key={idea.id}
+                onClick={() => onOpen(idea)}
+                className={`p-3.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-all space-y-2.5 saas-shadow cursor-pointer ${
+                  od?.level === 'red' ? 'bg-rose-50/30' : ''
+                }`}
+                style={{ borderLeftColor: od?.level === 'red' ? '#E11D48' : (ch?.color || '#CBD5E1'), borderLeftWidth: 4 }}>
+                
+                {/* Header Row: Channel / Platform + Status Badge */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <div className="inline-flex items-center justify-center w-5 h-5 rounded bg-slate-100 text-slate-600 shrink-0">
+                      <Icon size={12} />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 truncate">
+                      {ch?.name || "Kênh"}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono truncate">
+                      · {pl?.name}
+                    </span>
+                  </div>
+
+                  <span 
+                    className="px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 whitespace-nowrap"
+                    style={{ background: statusStyle.bg, color: statusStyle.fg, border: `1px solid ${statusStyle.bd}` }}>
+                    {STATUS_LABEL[idea.status]}
+                  </span>
+                </div>
+
+                {/* Title & snippet */}
+                <div>
+                  <h4 className="text-xs font-bold text-[#0F172A] leading-snug line-clamp-2">
+                    {idea.title}
+                  </h4>
+                  {idea.logline ? (
+                    <div className="text-[10.5px] text-amber-900 bg-amber-50 px-2 py-1 rounded border border-amber-200/60 line-clamp-2 mt-1.5 font-medium">
+                      <span className="font-bold text-[9px] uppercase tracking-wider text-amber-700 mr-1">Logline:</span>
+                      {idea.logline}
+                    </div>
+                  ) : idea.description ? (
+                    <p className="text-[11px] text-[#64748B] line-clamp-2 mt-1">
+                      {idea.description}
+                    </p>
+                  ) : null}
+                </div>
+
+                {/* Tags row */}
+                {(idea.contentPillar || idea.angle || idea.keyMessage || idea.qaFeedback) && (
+                  <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                    {idea.contentPillar && (
+                      <span className="text-[9.5px] text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200/60 font-semibold truncate max-w-[150px]">
+                        🎯 {idea.contentPillar}
+                      </span>
+                    )}
+                    {idea.angle && (
+                      <span className="text-[9.5px] text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100 font-medium truncate max-w-[150px]">
+                        <span className="font-bold">Angle:</span> {idea.angle}
+                      </span>
+                    )}
+                    {idea.qaFeedback && (
+                      <div className="text-[9.5px] text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 inline-flex items-center gap-1 font-medium w-full">
+                        <AlertTriangle size={10} className="shrink-0" /> Sửa: {idea.qaFeedback}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Footer Row: Assignee + Deadline/Overdue + Actions */}
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <UserAvatar name={assignee?.name || submitter?.name || "—"} size={18} />
+                    <span className="text-[11px] text-slate-700 font-medium truncate">
+                      {assignee?.name || submitter?.name || "Chưa giao"}
+                    </span>
+                    {od ? (
+                      <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.2 rounded flex items-center gap-0.5 shrink-0">
+                        <AlertTriangle size={10} /> Trễ
+                      </span>
+                    ) : idea.endDate ? (
+                      <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                        {fmtDate(idea.endDate)}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {idea.status === "PITCH" && actor.role === "Core" && (
+                      <button 
+                        onClick={() => onApprove(idea)}
+                        className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">
+                        Duyệt
+                      </button>
+                    )}
+                    {idea.status === "ASSIGNMENT" && idea.assignedToEmail === actor.id && (
+                      <button 
+                        onClick={() => onSubmitScript(idea)}
+                        className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-bold">
+                        Nộp KB
+                      </button>
+                    )}
+                    {idea.status === "PRODUCTION" && idea.assignedToEmail === actor.id && (
+                      <button 
+                        onClick={() => onSubmitVideo(idea)}
+                        className="px-2 py-1 rounded-md bg-purple-50 text-purple-700 border border-purple-200 text-[11px] font-bold">
+                        Nộp video
+                      </button>
+                    )}
+                    {idea.status === "QA" && (actor.role === "E" || actor.role === "Core") && (
+                      <>
+                        <button 
+                          onClick={() => onQaComplete(idea)}
+                          className="p-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <Check size={13} />
+                        </button>
+                        <button 
+                          onClick={() => onQaReject(idea)}
+                          className="p-1 rounded-md bg-rose-50 text-rose-700 border border-rose-200">
+                          <X size={13} />
+                        </button>
+                      </>
+                    )}
+                    <button 
+                      onClick={() => onOpen(idea)}
+                      className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* DESKTOP DATA TABLE CONTAINER (hidden sm:block) */}
+      <div className="hidden sm:block bg-white border border-[#E2E8F0] rounded-xl saas-shadow overflow-hidden">
+        <div className="overflow-x-auto min-w-[700px]">
           <table className="w-full text-left border-collapse">
             {/* TABLE HEADER */}
             <thead>
@@ -2653,11 +2929,15 @@ function DashboardView({
                                 <span className="font-bold">Key Msg:</span> {idea.keyMessage}
                               </span>
                             )}
-                            {idea.referenceLinks && (
-                              <span className="text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100 font-medium inline-flex items-center gap-0.5">
-                                <LinkIcon size={9} /> Ref
-                              </span>
-                            )}
+                            {idea.referenceLinks && (() => {
+                              const refs = parseReferences(idea.referenceLinks);
+                              if (refs.length === 0) return null;
+                              return (
+                                <span className="text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100 font-medium inline-flex items-center gap-0.5" title={refs.map(r => r.title ? `${r.title}: ${r.url}` : r.url).join("\n")}>
+                                  <LinkIcon size={9} /> {refs.length > 1 ? `${refs.length} Refs` : "Ref"}
+                                </span>
+                              );
+                            })()}
                           </div>
                         )}
 
@@ -3133,16 +3413,18 @@ function IdeaSlideOverDrawer({
                 <span className="font-bold text-slate-900 block mb-0.5 text-[11px] uppercase tracking-wider">
                   Nội dung chi tiết (Content):
                 </span>
-                <p className="text-slate-700 whitespace-pre-line">{idea.description}</p>
+                <div className="text-slate-700">
+                  <FormattedText text={idea.description} />
+                </div>
               </div>
             )}
 
             {idea.referenceLinks && (
               <div>
-                <span className="font-bold text-slate-900 block mb-0.5 text-[11px] uppercase tracking-wider">
+                <span className="font-bold text-slate-900 block mb-1 text-[11px] uppercase tracking-wider">
                   Link tham khảo (Reference):
                 </span>
-                <p className="text-blue-600 hover:underline break-words"><a href={idea.referenceLinks} target="_blank" rel="noreferrer">{idea.referenceLinks}</a></p>
+                <ReferenceList references={idea.referenceLinks} />
               </div>
             )}
 
@@ -3373,29 +3655,29 @@ function BoardView({
   return (
     <div className="space-y-4">
       {/* TOP CONTROLS & FILTER BAR */}
-      <div className="p-3.5 rounded-xl border border-[#E2E8F0] bg-white saas-shadow flex flex-wrap items-center justify-between gap-3">
+      <div className="p-3 sm:p-3.5 rounded-xl border border-[#E2E8F0] bg-white saas-shadow flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
         <div className="flex items-center gap-2">
           {/* Subtabs: Active vs Archived */}
-          <div className="flex p-0.5 bg-slate-100 rounded-lg border border-slate-200 text-xs">
+          <div className="flex p-0.5 bg-slate-100 rounded-lg border border-slate-200 text-xs w-full sm:w-auto">
             <button 
               onClick={() => setBoardSubTab("active")}
-              className={`px-3 py-1 rounded-md font-semibold transition-all ${boardSubTab === "active" ? "bg-white text-slate-900 saas-shadow" : "text-slate-600 hover:text-slate-900"}`}>
+              className={`flex-1 sm:flex-initial px-3 py-1 rounded-md font-semibold transition-all ${boardSubTab === "active" ? "bg-white text-slate-900 saas-shadow" : "text-slate-600 hover:text-slate-900"}`}>
               Đang thực hiện
             </button>
             <button 
               onClick={() => setBoardSubTab("archived")}
-              className={`px-3 py-1 rounded-md font-semibold transition-all ${boardSubTab === "archived" ? "bg-white text-slate-900 saas-shadow" : "text-slate-600 hover:text-slate-900"}`}>
+              className={`flex-1 sm:flex-initial px-3 py-1 rounded-md font-semibold transition-all ${boardSubTab === "archived" ? "bg-white text-slate-900 saas-shadow" : "text-slate-600 hover:text-slate-900"}`}>
               Lưu trữ / Đã huỷ
             </button>
           </div>
         </div>
 
         {/* Filter dropdowns */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
           <select 
             value={filterChannelGroupId} 
             onChange={(e) => setFilterChannelGroupId(e.target.value)}
-            className="px-2.5 py-1 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 outline-none">
+            className="flex-1 sm:flex-initial px-2.5 py-1 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 outline-none">
             <option value="ALL">Tất cả Kênh</option>
             {channelGroups.filter((c: any) => !c.archived).map((c: any) => (
               <option key={c.id} value={c.id}>{c.name}</option>
@@ -3405,7 +3687,7 @@ function BoardView({
           <select 
             value={filterPlatformId} 
             onChange={(e) => setFilterPlatformId(e.target.value)}
-            className="px-2.5 py-1 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 outline-none">
+            className="flex-1 sm:flex-initial px-2.5 py-1 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 outline-none">
             <option value="ALL">Tất cả Nền tảng</option>
             {platforms.map((p: any) => (
               <option key={p.id} value={p.id}>{p.name}</option>
@@ -3415,7 +3697,7 @@ function BoardView({
           <select 
             value={filterAssignee} 
             onChange={(e) => setFilterAssignee(e.target.value)}
-            className="px-2.5 py-1 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 outline-none">
+            className="w-full sm:w-auto px-2.5 py-1 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 outline-none">
             <option value="ALL">Tất cả Thành viên</option>
             {Object.values(memberById).map((m: any) => (
               <option key={m.id} value={m.id}>{m.name}</option>
@@ -3425,13 +3707,13 @@ function BoardView({
       </div>
 
       {/* KANBAN BOARD COLUMNS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3.5 overflow-x-auto pb-4">
+      <div className="flex md:grid md:grid-cols-3 lg:grid-cols-6 gap-3.5 overflow-x-auto pb-4 no-scrollbar -mx-1 px-1 sm:mx-0 sm:px-0 snap-x">
         {STATUS_ORDER.map((statusKey) => {
           const colIdeas = filteredIdeas.filter((i: Idea) => i.status === statusKey);
           const colStyle = STATUS_COLORS[statusKey];
 
           return (
-            <div key={statusKey} className="flex flex-col rounded-xl border border-slate-200 bg-[#F1F5F9]/60 p-2.5 min-h-[500px]">
+            <div key={statusKey} className="w-[82vw] sm:w-[320px] md:w-auto shrink-0 snap-start flex flex-col rounded-xl border border-slate-200 bg-[#F1F5F9]/60 p-2.5 min-h-[480px]">
               
               {/* COLUMN HEADER */}
               <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200 px-1">
@@ -3494,11 +3776,15 @@ function BoardView({
                               Angle: {idea.angle}
                             </span>
                           )}
-                          {idea.referenceLinks && (
-                            <span className="text-[9px] text-blue-700 bg-blue-50 px-1 py-0.2 rounded font-medium inline-flex items-center gap-0.5">
-                              <LinkIcon size={8} /> Ref
-                            </span>
-                          )}
+                          {idea.referenceLinks && (() => {
+                            const refs = parseReferences(idea.referenceLinks);
+                            if (refs.length === 0) return null;
+                            return (
+                              <span className="text-[9px] text-blue-700 bg-blue-50 px-1 py-0.2 rounded font-medium inline-flex items-center gap-0.5" title={refs.map(r => r.title ? `${r.title}: ${r.url}` : r.url).join("\n")}>
+                                <LinkIcon size={8} /> {refs.length > 1 ? `${refs.length} Refs` : "Ref"}
+                              </span>
+                            );
+                          })()}
                         </div>
                       )}
 
@@ -3603,9 +3889,10 @@ function ChannelGanttView({
               Tiến độ sản xuất Kênh: {currentChannel?.name}
             </h3>
             {currentChannel?.description && (
-              <p className="text-[11px] text-slate-600 mt-1">
-                <span className="font-semibold text-slate-800">Mô tả định hướng:</span> {currentChannel.description}
-              </p>
+              <div className="text-[11px] text-slate-600 mt-1 max-w-3xl">
+                <span className="font-semibold text-slate-800">Mô tả định hướng:</span>{" "}
+                <FormattedText text={currentChannel.description} />
+              </div>
             )}
             {currentChannel?.videoFormat && (
               <p className="text-[11px] text-slate-600 mt-0.5">
@@ -3613,12 +3900,9 @@ function ChannelGanttView({
               </p>
             )}
             {currentChannel?.referenceVideoLink && (
-              <p className="text-[11px] text-slate-600 mt-0.5">
-                <span className="font-semibold text-slate-800">Video mẫu tham khảo:</span>{" "}
-                <a href={currentChannel.referenceVideoLink} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
-                  {currentChannel.referenceVideoLink}
-                </a>
-              </p>
+              <div className="mt-2 max-w-3xl">
+                <ReferenceList references={currentChannel.referenceVideoLink} title="Tài liệu & Video tham khảo Kênh" />
+              </div>
             )}
           </div>
           <span className="text-xs text-slate-500 font-mono mt-1">Tháng {today.getMonth() + 1}/{today.getFullYear()}</span>

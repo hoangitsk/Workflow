@@ -12,6 +12,14 @@ export interface Member {
   active: boolean;
 }
 
+export type ReferenceType = "video" | "doc" | "drive" | "audio" | "image" | "other";
+
+export interface ReferenceItem {
+  url: string;
+  title?: string;
+  type?: ReferenceType;
+}
+
 export interface Platform {
   id: string;
   name: string;

@@ -79,3 +79,27 @@ export async function closePitchingBatchAction(batchId: string) {
   await recordAuditLog('', member.id, "Đóng đợt Call Pitching", { batchId });
   revalidatePath("/");
 }
+
+export async function reopenPitchingBatchAction(batchId: string) {
+  const member = await getCurrentMember();
+  if (!member) throw new Error("Chưa đăng nhập");
+  if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền mở lại đợt Call Pitching");
+
+  const sql = getDb();
+  await sql.query(`UPDATE pitching_batches SET status = 'OPEN' WHERE id = $1`, [batchId]);
+
+  await recordAuditLog('', member.id, "Mở lại đợt Call Pitching", { batchId });
+  revalidatePath("/");
+}
+
+export async function deletePitchingBatchAction(batchId: string) {
+  const member = await getCurrentMember();
+  if (!member) throw new Error("Chưa đăng nhập");
+  if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền xoá đợt Call Pitching");
+
+  const sql = getDb();
+  await sql.query(`DELETE FROM pitching_batches WHERE id = $1`, [batchId]);
+
+  await recordAuditLog('', member.id, "Xoá đợt Call Pitching", { batchId });
+  revalidatePath("/");
+}
