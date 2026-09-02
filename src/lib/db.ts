@@ -39,6 +39,47 @@ function toDateString(val: any, fallback = ''): string {
   return isNaN(d.getTime()) ? str : d.toISOString().slice(0, 10);
 }
 
+let schemaEnsured = false;
+let schemaEnsuringPromise: Promise<void> | null = null;
+
+export async function ensureSchema(sql: any): Promise<void> {
+  if (schemaEnsured) return;
+  if (schemaEnsuringPromise) return schemaEnsuringPromise;
+
+  schemaEnsuringPromise = (async () => {
+    try {
+      const migrations = [
+        'ALTER TABLE ideas ADD COLUMN IF NOT EXISTS logline TEXT;',
+        'ALTER TABLE ideas ADD COLUMN IF NOT EXISTS reference_links TEXT;',
+        'ALTER TABLE ideas ADD COLUMN IF NOT EXISTS angle TEXT;',
+        'ALTER TABLE ideas ADD COLUMN IF NOT EXISTS key_message TEXT;',
+        'ALTER TABLE ideas ADD COLUMN IF NOT EXISTS pitching_batch_id TEXT;',
+        'ALTER TABLE ideas ADD COLUMN IF NOT EXISTS content_pillar TEXT;',
+        'ALTER TABLE pitching_batches ADD COLUMN IF NOT EXISTS category TEXT;',
+        'ALTER TABLE pitching_batches ADD COLUMN IF NOT EXISTS example_angles TEXT;',
+        'ALTER TABLE channel_groups ADD COLUMN IF NOT EXISTS description TEXT;',
+        'ALTER TABLE channel_groups ADD COLUMN IF NOT EXISTS reference_video_link TEXT;',
+        'ALTER TABLE channel_groups ADD COLUMN IF NOT EXISTS video_format TEXT;',
+        'ALTER TABLE channel_groups ADD COLUMN IF NOT EXISTS discord_webhook_url TEXT;'
+      ];
+      for (const m of migrations) {
+        try {
+          await sql.query(m);
+        } catch {
+          // ignore
+        }
+      }
+      schemaEnsured = true;
+    } catch (e) {
+      console.error("Auto schema migration error:", e);
+    } finally {
+      schemaEnsuringPromise = null;
+    }
+  })();
+
+  return schemaEnsuringPromise;
+}
+
 export async function getAllData(): Promise<{
   members: Member[];
   platforms: Platform[];
@@ -71,6 +112,9 @@ export async function getAllData(): Promise<{
       pitchingBatches: []
     };
   }
+
+  // Ensure missing columns exist in the background
+  ensureSchema(sql).catch(() => {});
 
   const safeQuery = async (queryText: string, params: any[] = []): Promise<any[]> => {
     try {
