@@ -21,16 +21,18 @@ export default async function PublicPortfolioPage({ params }: Props) {
 
   try {
     const data = await getAllData();
-    members = data.members;
-    ideas = data.ideas;
-    channelGroups = data.channelGroups;
-    platforms = data.platforms;
-    platformChannels = data.platformChannels;
+    if (data) {
+      members = Array.isArray(data.members) ? data.members : [];
+      ideas = Array.isArray(data.ideas) ? data.ideas : [];
+      channelGroups = Array.isArray(data.channelGroups) ? data.channelGroups : [];
+      platforms = Array.isArray(data.platforms) ? data.platforms : [];
+      platformChannels = Array.isArray(data.platformChannels) ? data.platformChannels : [];
+    }
   } catch (err) {
     console.error("Lỗi nạp portfolio:", err);
   }
 
-  const member = members.find(m => (m.id || '').toLowerCase().trim() === decodedId);
+  const member = members.find(m => (m?.id || '').toLowerCase().trim() === decodedId);
   if (!member) {
     return notFound();
   }

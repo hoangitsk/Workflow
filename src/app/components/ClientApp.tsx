@@ -113,27 +113,62 @@ const WEEKDAY_INFO: Record<number, { tag: string; title: string; who: string; de
 /* ---------------------------------------------------------------------
    HELPERS
 --------------------------------------------------------------------- */
-const iso = (d: any) => new Date(d).toISOString().slice(0, 10);
+const iso = (d: any) => {
+  if (!d) return "";
+  try {
+    const parsed = new Date(d);
+    if (isNaN(parsed.getTime())) return "";
+    return parsed.toISOString().slice(0, 10);
+  } catch {
+    return "";
+  }
+};
 const today = new Date();
 const todayIso = iso(today);
-const fmtDate = (s: any) => { if (!s) return "—"; const d = new Date(s); if (isNaN(d.getTime())) return "—"; return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`; };
-const fmtDateFull = (s: any) => { if (!s) return "—"; const d = new Date(s); if (isNaN(d.getTime())) return "—"; return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`; };
-const fmtDateTime = (s: any) => { if (!s) return "—"; const d = new Date(s); if (isNaN(d.getTime())) return "—"; return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")} · ${fmtDate(d)}`; };
+const fmtDate = (s: any) => { 
+  if (!s) return "—"; 
+  const d = new Date(s); 
+  if (isNaN(d.getTime())) return "—"; 
+  return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`; 
+};
+const fmtDateFull = (s: any) => { 
+  if (!s) return "—"; 
+  const d = new Date(s); 
+  if (isNaN(d.getTime())) return "—"; 
+  return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`; 
+};
+const fmtDateTime = (s: any) => { 
+  if (!s) return "—"; 
+  const d = new Date(s); 
+  if (isNaN(d.getTime())) return "—"; 
+  return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")} · ${fmtDate(d)}`; 
+};
 
 export function overdueInfo(idea: Idea) {
   if (idea.status === "ASSIGNMENT" && idea.assignedAt) {
-    const hrs = (Date.now() - new Date(idea.assignedAt).getTime()) / 36e5;
-    if (hrs > 24) return { level: "yellow", msg: "Quá 1 ngày chưa nộp kịch bản" };
+    const assignedTime = new Date(idea.assignedAt).getTime();
+    if (!isNaN(assignedTime)) {
+      const hrs = (Date.now() - assignedTime) / 36e5;
+      if (hrs > 24) return { level: "yellow", msg: "Quá 1 ngày chưa nộp kịch bản" };
+    }
   }
   if (idea.status === "PRODUCTION" && idea.endDate) {
-    const end = new Date(iso(idea.endDate) + "T23:59:59");
-    const diffDays = (end.getTime() - today.getTime()) / 864e5;
-    if (diffDays < 0) return { level: "red", msg: `Đã trễ hạn (${fmtDate(idea.endDate)})` };
-    if (diffDays <= 1) return { level: "yellow", msg: `Còn ≤1 ngày (${fmtDate(idea.endDate)})` };
+    const isoDate = iso(idea.endDate);
+    if (isoDate) {
+      const end = new Date(isoDate + "T23:59:59");
+      if (!isNaN(end.getTime())) {
+        const diffDays = (end.getTime() - today.getTime()) / 864e5;
+        if (diffDays < 0) return { level: "red", msg: `Đã trễ hạn (${fmtDate(idea.endDate)})` };
+        if (diffDays <= 1) return { level: "yellow", msg: `Còn ≤1 ngày (${fmtDate(idea.endDate)})` };
+      }
+    }
   }
   if (idea.status === "QA" && idea.videoSubmittedAt) {
-    const hrs = (Date.now() - new Date(idea.videoSubmittedAt).getTime()) / 36e5;
-    if (hrs > 24) return { level: "yellow", msg: "Quá 24 giờ chưa duyệt QA" };
+    const submittedTime = new Date(idea.videoSubmittedAt).getTime();
+    if (!isNaN(submittedTime)) {
+      const hrs = (Date.now() - submittedTime) / 36e5;
+      if (hrs > 24) return { level: "yellow", msg: "Quá 24 giờ chưa duyệt QA" };
+    }
   }
   return null;
 }
