@@ -1,6 +1,19 @@
 import { getAllData } from "../lib/db";
 import { getCurrentMember } from "../actions/auth-actions";
 import ClientApp from "./components/ClientApp";
+import { 
+  Member, 
+  Platform, 
+  ChannelGroup, 
+  PlatformChannel, 
+  Idea, 
+  CommentItem, 
+  AuditLogItem, 
+  NotificationItem, 
+  ChecklistItem, 
+  AppSettings, 
+  PitchingBatch 
+} from "../lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +25,21 @@ export default async function Page() {
     console.error("Lỗi lấy thông tin tài khoản hiện tại:", err);
   }
 
-  let initialData = {
+  type InitialData = {
+    members: Member[];
+    platforms: Platform[];
+    channelGroups: ChannelGroup[];
+    platformChannels: PlatformChannel[];
+    ideas: Idea[];
+    comments: CommentItem[];
+    auditLogs: AuditLogItem[];
+    notifications: NotificationItem[];
+    checklists: ChecklistItem[];
+    settings: AppSettings;
+    pitchingBatches: PitchingBatch[];
+  };
+
+  let initialData: InitialData = {
     members: [],
     platforms: [],
     channelGroups: [],

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { 
-  Video, Play, FileText, FolderOpen, Music, Image as ImageIcon, 
-  Link as LinkIcon, ExternalLink, Plus, Trash2, ListPlus, Sparkles, 
-  ChevronDown, Globe, Check, Copy
+  Video, FileText, FolderOpen, Music, Image as ImageIcon, 
+  ExternalLink, Plus, Trash2, ListPlus, Sparkles, 
+  ChevronDown, Globe, Check
 } from "lucide-react";
 import { ReferenceType, ReferenceItem } from "./types";
 
@@ -155,13 +155,13 @@ export function detectReferenceType(url: string): ReferenceType {
  * Phân tích chuỗi đầu vào thành mảng ReferenceItem
  * Hỗ trợ: JSON array, chuỗi nhiều dòng URL, text có link, single URL legacy
  */
-export function parseReferences(input?: string | ReferenceItem[] | null): ReferenceItem[] {
+export function parseReferences(input?: string | (ReferenceItem | string)[] | null): ReferenceItem[] {
   if (!input) return [];
 
   // Nếu đã là mảng
   if (Array.isArray(input)) {
-    return input
-      .filter(item => item && (typeof item === "string" || (typeof item === "object" && item.url)))
+    return (input as (string | ReferenceItem)[])
+      .filter((item): item is string | ReferenceItem => Boolean(item && (typeof item === "string" || (typeof item === "object" && "url" in item && Boolean((item as ReferenceItem).url)))))
       .map(item => {
         if (typeof item === "string") {
           return {
@@ -176,7 +176,7 @@ export function parseReferences(input?: string | ReferenceItem[] | null): Refere
           type: item.type || detectReferenceType(item.url)
         };
       })
-      .filter(i => i.url);
+      .filter(i => Boolean(i.url));
   }
 
   const raw = String(input).trim();
@@ -331,10 +331,9 @@ export function FormattedText({
   className?: string;
   linkClassName?: string;
 }) {
-  if (!text) return null;
-
   // Regex nhận diện Markdown links [title](url) và standard URLs
   const tokens = useMemo(() => {
+    if (!text) return [];
     const regex = /(\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\))|(https?:\/\/[^\s<>"]+)|(www\.[^\s<>"]+)/g;
     const parts: Array<{ type: "text" | "link"; content: string; url?: string; label?: string }> = [];
     let lastIndex = 0;
@@ -387,6 +386,8 @@ export function FormattedText({
 
     return parts;
   }, [text]);
+
+  if (!text || tokens.length === 0) return null;
 
   return (
     <span className={`whitespace-pre-wrap leading-relaxed ${className}`}>
@@ -524,7 +525,7 @@ export function MultiReferenceEditor({
   placeholder = "Dán link YouTube, TikTok, Docs, Drive, Notion..."
 }: {
   id?: string;
-  defaultValue?: string | ReferenceItem[];
+  defaultValue?: string | (ReferenceItem | string)[] | null;
   label?: string;
   helperText?: string;
   placeholder?: string;

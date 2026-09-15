@@ -93,7 +93,64 @@ async function initSchema() {
       logline TEXT,
       reference_links TEXT,
       angle TEXT,
-      key_message TEXT
+      key_message TEXT,
+      pitching_batch_id TEXT,
+      content_pillar TEXT,
+      -- Gating and State Machine (R2)
+      active_gate VARCHAR(50) DEFAULT 'GATE_1_IDEA',
+      gate1_approved_at VARCHAR(100),
+      gate1_approved_by_email VARCHAR(255),
+      script_status VARCHAR(50) DEFAULT 'DRAFT',
+      script_locked BOOLEAN DEFAULT FALSE,
+      script_revision_notes TEXT,
+      gate2_approved_at VARCHAR(100),
+      gate2_approved_by_email VARCHAR(255),
+      gate4_approved_at VARCHAR(100),
+      gate4_approved_by_email VARCHAR(255),
+      gate5_approved_at VARCHAR(100),
+      gate5_approved_by_email VARCHAR(255),
+      core_approval_notes TEXT,
+      -- Script 4-Column & Copyright (R3)
+      script_data JSONB,
+      copyright_commitment BOOLEAN DEFAULT FALSE,
+      -- Dual Interactive Checklists & TikTok Checklist (R4, R5)
+      production_checklist JSONB,
+      qc_checklist JSONB,
+      tiktok_checklist JSONB,
+      -- TikTok Derivative Workflow (R5)
+      parent_task_id VARCHAR(100),
+      derivative_type VARCHAR(50) DEFAULT 'NONE',
+      source_video_url TEXT,
+      tiktok_target_duration VARCHAR(50) DEFAULT '30-45s',
+      tiktok_reframe_applied BOOLEAN DEFAULT FALSE,
+      tiktok_hook_summary TEXT,
+      tiktok_cta_route TEXT,
+      -- Extended Metadata & Deadlines (R6)
+      platform_type VARCHAR(50) DEFAULT 'YOUTUBE_MASTER',
+      channel_tier VARCHAR(50),
+      master_video_link TEXT,
+      asset_folder_link TEXT,
+      script_doc_link TEXT,
+      video_draft_link TEXT,
+      source_project_link TEXT,
+      video_final_link TEXT,
+      deadline_script VARCHAR(50),
+      deadline_production VARCHAR(50),
+      deadline_qc VARCHAR(50),
+      target_publish_date VARCHAR(50),
+      copyright_footage VARCHAR(50) DEFAULT 'PENDING',
+      copyright_music VARCHAR(50) DEFAULT 'PENDING',
+      copyright_mascot VARCHAR(50) DEFAULT 'OFFICIAL',
+      -- Publish & Post-Publish Analytics (R6)
+      published_title TEXT,
+      published_thumbnail TEXT,
+      published_caption TEXT,
+      published_hashtags TEXT,
+      metrics_views NUMERIC DEFAULT 0,
+      metrics_retention VARCHAR(50),
+      metrics_ctr VARCHAR(50),
+      metrics_comments INT DEFAULT 0,
+      metrics_insights TEXT
     );
   `);
 
@@ -200,6 +257,69 @@ async function initSchema() {
   try {
     await sql.query(`ALTER TABLE channel_groups ADD COLUMN video_format TEXT;`);
   } catch (e) { /* ignores if exists */ }
+
+  // SOP Migrations for existing databases
+  const sopMigrations = [
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS active_gate VARCHAR(50) DEFAULT 'GATE_1_IDEA';",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS gate1_approved_at VARCHAR(100);",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS gate1_approved_by_email VARCHAR(255);",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS script_status VARCHAR(50) DEFAULT 'DRAFT';",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS script_locked BOOLEAN DEFAULT FALSE;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS script_revision_notes TEXT;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS gate2_approved_at VARCHAR(100);",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS gate2_approved_by_email VARCHAR(255);",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS gate4_approved_at VARCHAR(100);",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS gate4_approved_by_email VARCHAR(255);",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS gate5_approved_at VARCHAR(100);",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS gate5_approved_by_email VARCHAR(255);",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS core_approval_notes TEXT;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS script_data JSONB;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS copyright_commitment BOOLEAN DEFAULT FALSE;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS production_checklist JSONB;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS qc_checklist JSONB;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS tiktok_checklist JSONB;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS parent_task_id VARCHAR(100);",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS derivative_type VARCHAR(50) DEFAULT 'NONE';",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS source_video_url TEXT;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS tiktok_target_duration VARCHAR(50) DEFAULT '30-45s';",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS tiktok_reframe_applied BOOLEAN DEFAULT FALSE;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS tiktok_hook_summary TEXT;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS tiktok_cta_route TEXT;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS platform_type VARCHAR(50) DEFAULT 'YOUTUBE_MASTER';",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS channel_tier VARCHAR(50);",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS master_video_link TEXT;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS asset_folder_link TEXT;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS script_doc_link TEXT;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS video_draft_link TEXT;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS source_project_link TEXT;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS video_final_link TEXT;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS deadline_script VARCHAR(50);",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS deadline_production VARCHAR(50);",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS deadline_qc VARCHAR(50);",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS target_publish_date VARCHAR(50);",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS copyright_footage VARCHAR(50) DEFAULT 'PENDING';",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS copyright_music VARCHAR(50) DEFAULT 'PENDING';",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS copyright_mascot VARCHAR(50) DEFAULT 'OFFICIAL';",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS published_title TEXT;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS published_thumbnail TEXT;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS published_caption TEXT;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS published_hashtags TEXT;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS metrics_views NUMERIC DEFAULT 0;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS metrics_retention VARCHAR(50);",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS metrics_ctr VARCHAR(50);",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS metrics_comments INT DEFAULT 0;",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS metrics_insights TEXT;",
+    "CREATE INDEX IF NOT EXISTS idx_ideas_parent_task_id ON ideas (parent_task_id);",
+    "CREATE INDEX IF NOT EXISTS idx_ideas_active_gate ON ideas (active_gate);",
+    "CREATE INDEX IF NOT EXISTS idx_ideas_platform_type ON ideas (platform_type);"
+  ];
+  for (const m of sopMigrations) {
+    try {
+      await sql.query(m);
+    } catch (e) {
+      // column or index might already exist
+    }
+  }
 
   console.log("✅ Schema initialized successfully!");
 }

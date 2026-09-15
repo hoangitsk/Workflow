@@ -20,7 +20,10 @@ import {
   submitVideoAction, qaPassAction, qaFailAction, deleteIdeaAction, cancelIdeaAction,
   archiveUnselectedIdeasAction, restoreArchivedIdeaAction, updateScheduledPostDateAction, 
   triggerDailyCronAction, reassignIdeaAction, updateIdeaDetailsAction, extendDeadlineAction,
-  updateIdeaNoteAction, rateIdeaAction, cloneIdeaAction
+  updateIdeaNoteAction, rateIdeaAction, cloneIdeaAction, submitScriptMatrixAction,
+  approveGate2ScriptAction, updateChecklistAction, submitVideoWithChecklistAction,
+  approveGate4QcAction, approveGate5CoreAction, publishVideoAction,
+  savePostPublishMetricsAction, createTikTokDerivativeAction
 } from "../../actions/idea-actions";
 import { 
   createChannelGroupAction, updateChannelGroupAction, archiveChannelGroupAction, restoreChannelGroupAction, 
@@ -34,6 +37,7 @@ import { createChecklistAction, updateChecklistStatusAction, deleteChecklistActi
 import { createPitchingBatchAction, closePitchingBatchAction, reopenPitchingBatchAction, deletePitchingBatchAction } from "../../actions/pitching-batch-actions";
 import { Member, Platform, ChannelGroup, PlatformChannel, Idea, CommentItem, AuditLogItem, NotificationItem, ChecklistItem, AppSettings, PitchingBatch, Role, ReferenceItem, ReferenceType } from "../../lib/types";
 import { FormattedText, ReferenceList, MultiReferenceEditor, parseReferences } from "../../lib/reference-utils";
+import ProductionTutorialView from "./ProductionTutorialView";
 
 /* ---------------------------------------------------------------------
    LIGHT WORKSPACE DESIGN TOKENS (CLEAN & MODERN SAAS)
@@ -763,6 +767,7 @@ export default function ClientApp({
   ];
 
   const NAV_PRODUCTION = [
+    { id: "tutorial", label: "Tutorial vận hành", icon: Play },
     { id: "board", label: "Pipeline Ý tưởng (Pitch)", icon: LayoutGrid },
     { id: "calendar", label: "Lịch phát hành", icon: CalendarDays },
     { id: "gantt", label: "Gantt theo Kênh", icon: Calendar },
@@ -1116,6 +1121,7 @@ export default function ClientApp({
            MAIN STAGE VIEWPORT (#F8FAFC)
         ------------------------------------------------------------- */}
         <main className="flex-1 p-3 sm:p-5 max-w-7xl w-full mx-auto">
+          {tab === "tutorial" && <ProductionTutorialView />}
           {tab === "dashboard" && (
             <DashboardView 
               ideas={ideas}
@@ -1897,7 +1903,7 @@ export default function ClientApp({
               <div>
                 <FieldLabel>Link Chủ đề Discord (Thread) hoặc Webhook riêng cho Kênh</FieldLabel>
                 <TextInput id="channelDiscordWebhook" placeholder="VD: Link chủ đề Discord https://discord.com/channels/... hoặc ID Thread" />
-                <p className="text-[11px] text-slate-500 mt-1">Chuột phải vào Chủ đề trên Discord -> <b>Sao chép liên kết</b> rồi dán vào đây để bot tự gửi tin vào đúng chủ đề kênh này.</p>
+                <p className="text-[11px] text-slate-500 mt-1">Chuột phải vào Chủ đề trên Discord &rarr; <b>Sao chép liên kết</b> rồi dán vào đây để bot tự gửi tin vào đúng chủ đề kênh này.</p>
               </div>
 
               <div>
@@ -1973,7 +1979,7 @@ export default function ClientApp({
               <div>
                 <FieldLabel>Link Chủ đề Discord (Thread) hoặc Webhook riêng cho Kênh</FieldLabel>
                 <TextInput id="editChannelDiscordWebhook" defaultValue={editChannelTarget.discordWebhookUrl || ""} placeholder="VD: Link chủ đề Discord https://discord.com/channels/... hoặc ID Thread" />
-                <p className="text-[11px] text-slate-500 mt-1">Chuột phải vào Chủ đề trên Discord -> <b>Sao chép liên kết</b> rồi dán vào đây để bot tự gửi tin vào đúng chủ đề kênh này.</p>
+                <p className="text-[11px] text-slate-500 mt-1">Chuột phải vào Chủ đề trên Discord &rarr; <b>Sao chép liên kết</b> rồi dán vào đây để bot tự gửi tin vào đúng chủ đề kênh này.</p>
               </div>
             </div>
 
@@ -2076,7 +2082,7 @@ export default function ClientApp({
               <div>
                 <FieldLabel required>Tuyến bài & Giai đoạn định hướng đợt này</FieldLabel>
                 <Select id="batchCategory" required>
-                  <option value="5. Personal Branding (Chuyên môn & Nhân vật)">5. Personal Branding — Chuyên môn -> Xây dựng nhân vật (tính cách, phân tích hành vi)</option>
+                  <option value="5. Personal Branding (Chuyên môn & Nhân vật)">5. Personal Branding — Chuyên môn &rarr; Xây dựng nhân vật (tính cách, phân tích hành vi)</option>
                   <option value="1. Branding (Làm sáng thương hiệu)">1. Branding — Làm sáng thương hiệu (Khẳng định giá trị core của Ý niệm điện ảnh)</option>
                   <option value="3. News (Tin tức ngành & Hot trend)">3. News — Cập nhật tin tức ngành, luật pháp, nội dung hot (Đào phim phân tích)</option>
                   <option value="4. PR (Niềm tin & Kiến thức ngành)">4. PR — Niềm tin người xem với ngành (Cung cấp thông tin điện ảnh)</option>
@@ -3334,6 +3340,8 @@ function IdeaSlideOverDrawer({
             </div>
           )}
 
+          <YndaWorkflowPanel idea={idea} actor={actor} runAction={runAction} />
+
           {/* SCRIPT / VIDEO / PUBLISHED LINKS */}
           <div className="space-y-1.5">
             {idea.scriptLink && (
@@ -3618,6 +3626,61 @@ function CreditItem({ icon: Icon, label, member }: any) {
       </span>
     </div>
   );
+}
+
+/* The task-level SOP console intentionally lives beside the legacy drawer so
+   older Kanban/Gantt views continue to consume the same optional Idea fields. */
+function YndaWorkflowPanel({ idea, actor, runAction }: any) {
+  const [scriptOpen, setScriptOpen] = useState(false);
+  const [draftLink, setDraftLink] = useState(idea.videoDraftLink || "");
+  const [sourceLink, setSourceLink] = useState(idea.sourceProjectLink || "");
+  const [finalLink, setFinalLink] = useState(idea.videoFinalLink || "");
+  const [publishUrl, setPublishUrl] = useState(idea.publishedLink || "");
+  const gate = idea.activeGate || idea.active_gate || "GATE_1_IDEA";
+  const isEditor = actor.role === "E" || actor.role === "Core";
+  const checklist = (kind: "production" | "qc" | "tiktok", items: any[] | undefined, title: string) => {
+    if (!items?.length) return null;
+    const done = items.filter(i => i.checked).length;
+    const canEdit = kind === "qc" ? isEditor : (idea.assignedToEmail === actor.id || isEditor);
+    return <div className="rounded-lg border border-slate-200 bg-white p-3">
+      <div className="mb-2 flex items-center justify-between"><b className="text-[11px] text-slate-900">{title}</b><span className="text-[10px] font-bold text-indigo-700">{done}/{items.length}</span></div>
+      <div className="space-y-1.5">{items.map((item: any, index: number) => <label key={item.id || index} className={`flex gap-2 text-[11px] leading-4 ${canEdit ? "cursor-pointer" : "opacity-70"}`}>
+        <input type="checkbox" checked={!!item.checked} disabled={!canEdit} onChange={() => {
+          const next = items.map((x: any, i: number) => i === index ? { ...x, checked: !x.checked, checkedAt: !x.checked ? new Date().toISOString() : undefined, checkedByEmail: !x.checked ? actor.id : undefined } : x);
+          runAction(updateChecklistAction, idea.id, kind, next);
+        }} /> <span>{item.label}</span>
+      </label>)}</div>
+    </div>;
+  };
+  const submitScript = (form: HTMLFormElement) => {
+    const data = new FormData(form);
+    const row = (id: string, timeRange: string, segmentName: string) => ({ id, timeRange, segmentName, voiceAiText: String(data.get(`${id}Voice`) || ""), visualMascotEdits: String(data.get(`${id}Visual`) || ""), bgmSfxNotes: String(data.get(`${id}Audio`) || "") });
+    runAction(submitScriptMatrixAction, idea.id, {
+      episodeName: String(data.get("episodeName") || idea.title), channelTier: data.get("channelTier") || "KENH_1_GIAO_DUC", writerProducerEmail: actor.id,
+      submissionDeadline: String(data.get("deadline") || ""), hook3Ws: { what: String(data.get("what") || ""), when: String(data.get("when") || ""), why: String(data.get("why") || "") },
+      segments: [row("hook", "00:00–00:15", "Intro / Hook"), row("body", "00:15–03:30", "Thân bài"), row("outro", "03:30–04:30", "Kết bài / Outro"), row("cta", "04:30–05:00", "CTA & Seamless Loop")],
+      summaryCardNotes: String(data.get("summary") || ""), seamlessLoopQuestion: String(data.get("loop") || ""), copyrightCommitment: data.get("copyright") === "on", status: "SUBMITTED", locked: false, updatedAt: new Date().toISOString()
+    });
+  };
+  return <section className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3.5 space-y-3">
+    <div className="flex items-start justify-between gap-3"><div><div className="text-[10px] font-bold tracking-wider text-indigo-600">YNDA · CỔNG KIỂM DUYỆT BẮT BUỘC</div><h4 className="mt-0.5 text-sm font-bold text-slate-900">{gate.replaceAll("_", " ")}</h4></div><span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-slate-600">{idea.platformType || "YOUTUBE_MASTER"}</span></div>
+    <div className="grid grid-cols-5 gap-1 text-center text-[9px] font-bold">{["Idea", "Script", "Production", "QC", "Core"].map((x, i) => <div key={x} className={`rounded py-1.5 ${Math.min(5, Number((gate.match(/GATE_(\d)/) || [])[1] || 1)) > i ? "bg-indigo-600 text-white" : "bg-white text-slate-400"}`}>{i + 1}. {x}</div>)}</div>
+
+    {gate === "GATE_2_SCRIPT" && <>
+      {!scriptOpen ? <div className="flex flex-wrap gap-2"><Btn small tone="primary" onClick={() => setScriptOpen(true)}><FileText size={12}/> Soạn script 4 cột</Btn>{isEditor && idea.scriptStatus === "SUBMITTED" && <Btn small tone="success" onClick={() => runAction(approveGate2ScriptAction, idea.id)}><Lock size={12}/> Duyệt & khóa script</Btn>}</div> :
+      <form className="space-y-2" onSubmit={e => { e.preventDefault(); submitScript(e.currentTarget); setScriptOpen(false); }}><div className="grid grid-cols-2 gap-2"><TextInput name="episodeName" defaultValue={idea.scriptData?.episodeName || idea.title} placeholder="Tên tập"/><TextInput name="deadline" type="date" defaultValue={idea.deadlineScript || ""}/></div><select name="channelTier" className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs"><option value="KENH_1_GIAO_DUC">Kênh 1: Giáo dục & Ứng dụng</option><option value="KENH_2_TAM_LY">Kênh 2: Tâm lý & Phản biện</option></select><div className="grid grid-cols-3 gap-2">{["what", "when", "why"].map(x => <TextInput key={x} name={x} required placeholder={`Hook 3Ws: ${x.toUpperCase()}`}/>)}</div><div className="overflow-x-auto"><table className="w-full min-w-[430px] text-[10px]"><thead><tr className="text-left text-slate-500"><th>Thời gian</th><th>Voice AI</th><th>Visual / mascot</th><th>BGM/SFX</th></tr></thead><tbody>{[["hook","00:00–00:15"],["body","00:15–03:30"],["outro","03:30–04:30"],["cta","04:30–05:00"]].map(([id, time]) => <tr key={id}><td className="pr-1 font-mono">{time}</td><td><textarea required name={`${id}Voice`} className="w-full border p-1"/></td><td><textarea required name={`${id}Visual`} className="w-full border p-1"/></td><td><textarea required name={`${id}Audio`} className="w-full border p-1"/></td></tr>)}</tbody></table></div><TextArea name="summary" rows={2} placeholder="Summary card / ghi chú outro"/><TextInput name="loop" placeholder="Câu hỏi CTA & seamless loop"/><label className="flex gap-2 text-[11px]"><input required name="copyright" type="checkbox"/> Tôi cam kết quyền sử dụng footage, âm nhạc và hình minh hoạ.</label><div className="flex gap-2"><Btn type="submit" small tone="primary">Nộp script</Btn><Btn type="button" small onClick={() => setScriptOpen(false)}>Đóng</Btn></div></form>}</>}
+
+    {gate === "GATE_3_PRODUCTION" && <><>{checklist("production", idea.productionChecklist, "Production checklist · phải hoàn tất trước bàn giao")}</><div className="grid grid-cols-2 gap-2"><TextInput value={draftLink} onChange={(e:any) => setDraftLink(e.target.value)} placeholder="Link video draft *"/><TextInput value={sourceLink} onChange={(e:any) => setSourceLink(e.target.value)} placeholder="Link source project *"/></div><Btn small tone="primary" onClick={() => runAction(submitVideoWithChecklistAction, idea.id, { videoDraftLink: draftLink, sourceProjectLink: sourceLink, assetFolderLink: idea.assetFolderLink || "" })}><Upload size={12}/> Bàn giao sang QC</Btn></>}
+    {gate === "GATE_4_QC" && <><>{checklist("qc", idea.qcChecklist, "Editor QC checklist · Editor hoàn thiện trực tiếp")}</><TextInput value={finalLink} onChange={(e:any) => setFinalLink(e.target.value)} placeholder="Link video final sau QC"/>{isEditor && <Btn small tone="success" onClick={() => runAction(approveGate4QcAction, idea.id, finalLink)}><ShieldCheck size={12}/> Gửi Core duyệt</Btn>}</>}
+    {gate === "GATE_5_CORE" && actor.role === "Core" && <Btn small tone="primary" onClick={() => runAction(approveGate5CoreAction, idea.id, "Duyệt chốt từ SOP console")}><CheckCircle2 size={12}/> Core duyệt chốt</Btn>}
+    {gate === "READY_TO_PUBLISH" && <div className="space-y-2"><TextInput value={publishUrl} onChange={(e:any) => setPublishUrl(e.target.value)} placeholder="URL bài đăng chính thức"/><Btn small tone="primary" onClick={() => runAction(publishVideoAction, idea.id, { publishedUrl: publishUrl, publishedTitle: idea.title, publishedCaption: idea.publishedCaption || "", publishedHashtags: idea.publishedHashtags || "" })}>Publish</Btn></div>}
+    {gate === "PUBLISHED" && <PublishedTools idea={idea} actor={actor} runAction={runAction} />}
+  </section>;
+}
+
+function PublishedTools({ idea, actor, runAction }: any) {
+  const [insights, setInsights] = useState(idea.metricsInsights || "");
+  return <div className="space-y-2"><div className="grid grid-cols-4 gap-1 text-[10px]"><span>Views: <b>{idea.metricsViews || 0}</b></span><span>Retention: <b>{idea.metricsRetention || "—"}</b></span><span>CTR: <b>{idea.metricsCtr || "—"}</b></span><span>Comments: <b>{idea.metricsComments || 0}</b></span></div><TextArea rows={2} value={insights} onChange={(e:any) => setInsights(e.target.value)} placeholder="Bài học / insight sau xuất bản"/><div className="flex flex-wrap gap-2"><Btn small onClick={() => runAction(savePostPublishMetricsAction, idea.id, { views: idea.metricsViews || 0, retention: idea.metricsRetention || "", ctr: idea.metricsCtr || "", comments: idea.metricsComments || 0, insights, createFeedbackIdea: true })}><RefreshCw size={12}/> Lưu & tạo feedback Idea</Btn>{(actor.role === "E" || actor.role === "Core") && <Btn small tone="primary" onClick={() => runAction(createTikTokDerivativeAction, idea.id, { title: `${idea.title} · TikTok`, hookSummary: "Hook mới 0–3 giây, luận điểm độc lập", ctaRoute: "Xem full YouTube + Cộng đồng Facebook", targetDuration: "30-45s", assigneeEmail: idea.assignedToEmail })}><Scissors size={12}/> Tạo TikTok 9:16</Btn>}</div></div>;
 }
 
 /* ---------------------------------------------------------------------
