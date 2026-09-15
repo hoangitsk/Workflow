@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import './survey.css';
 import SurveyFormClient from './SurveyFormClient';
 
 export const dynamic = 'force-dynamic';

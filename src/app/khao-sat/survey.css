@@ -1,0 +1,313 @@
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
+
+.survey-body {
+  --burgundy: #381412;
+  --burgundy-2: #552824;
+  --burgundy-3: #734D44;
+  --cream: #F1E7DC;
+  --cream-2: #FBF6EF;
+  --behong: #E4C7B5;
+  --taupe: #C8A898;
+  --line: #271E1B;
+  --shadow: #1A0A07;
+  --danger: #8C2B22;
+
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--cream) !important;
+  color: var(--burgundy) !important;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  line-height: 1.6;
+  padding: 48px 20px 80px;
+  box-sizing: border-box;
+}
+
+.survey-body * {
+  box-sizing: border-box;
+}
+
+.survey-sheet {
+  max-width: 640px;
+  margin: 0 auto;
+  background: var(--cream-2);
+  border: 1px solid var(--behong);
+  border-radius: 4px;
+  box-shadow: 0 4px 20px rgba(56, 20, 18, 0.05);
+  overflow: hidden;
+}
+
+.survey-leader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 28px;
+  border-bottom: 1px solid var(--behong);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--burgundy-3);
+}
+
+.survey-leader span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.survey-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--taupe);
+  display: inline-block;
+}
+
+.survey-hero {
+  padding: 36px 28px 28px;
+  border-bottom: 1px solid var(--behong);
+}
+
+.survey-kicker {
+  font-size: 13px;
+  color: var(--burgundy-3);
+  margin: 0 0 10px;
+  font-weight: 500;
+}
+
+.survey-hero h1 {
+  font-family: 'Lora', serif;
+  font-weight: 600;
+  font-size: 26px;
+  line-height: 1.35;
+  margin: 0 0 14px;
+  color: var(--burgundy);
+}
+
+.survey-intro {
+  font-size: 15px;
+  color: var(--burgundy-2);
+  max-width: 52ch;
+  margin: 0;
+  line-height: 1.65;
+}
+
+.survey-q {
+  padding: 28px;
+  border-bottom: 1px solid var(--behong);
+}
+
+.survey-q-num {
+  font-family: 'Lora', serif;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--taupe);
+  display: block;
+  margin-bottom: 8px;
+}
+
+.survey-q-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--burgundy);
+}
+
+.survey-q-hint {
+  font-size: 13px;
+  color: var(--burgundy-3);
+  margin: 0 0 16px;
+}
+
+.survey-scale {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.survey-scale-btn {
+  flex: 1;
+  min-width: 52px;
+  text-align: center;
+  border: 1px solid var(--taupe);
+  padding: 10px 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--burgundy-2);
+  cursor: pointer;
+  user-select: none;
+  background: transparent;
+  border-radius: 2px;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.survey-scale-btn:hover {
+  border-color: var(--burgundy-2);
+  background: rgba(228, 199, 181, 0.25);
+}
+
+.survey-scale-btn.active {
+  background: var(--burgundy);
+  border-color: var(--burgundy);
+  color: var(--cream-2);
+}
+
+.survey-scale-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--burgundy-3);
+  margin-top: 6px;
+}
+
+.survey-input,
+.survey-textarea {
+  width: 100%;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-size: 14px;
+  color: var(--burgundy);
+  background: #ffffff;
+  border: 1px solid var(--taupe);
+  border-radius: 2px;
+  padding: 11px 13px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.survey-input:focus,
+.survey-textarea:focus {
+  outline: none;
+  border-color: var(--burgundy);
+  box-shadow: 0 0 0 2px rgba(56, 20, 18, 0.1);
+}
+
+.survey-textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.survey-choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.survey-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid var(--taupe);
+  padding: 12px 14px;
+  cursor: pointer;
+  border-radius: 2px;
+  background: #ffffff;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.survey-choice:hover {
+  border-color: var(--burgundy-2);
+  background: rgba(228, 199, 181, 0.2);
+}
+
+.survey-choice.checked {
+  border-color: var(--burgundy);
+  background: var(--behong);
+}
+
+.survey-choice input[type="radio"] {
+  margin-top: 4px;
+  accent-color: var(--burgundy);
+  cursor: pointer;
+}
+
+.survey-choice-text {
+  font-size: 14px;
+  color: var(--burgundy-2);
+  font-weight: 500;
+}
+
+.survey-field {
+  margin-top: 12px;
+}
+
+.survey-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--burgundy-3);
+  margin-bottom: 6px;
+}
+
+.survey-footer {
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.survey-submit-btn {
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cream-2);
+  background: var(--burgundy);
+  border: none;
+  padding: 13px 28px;
+  cursor: pointer;
+  border-radius: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s ease;
+}
+
+.survey-submit-btn:hover:not(:disabled) {
+  background: var(--burgundy-2);
+}
+
+.survey-submit-btn:disabled {
+  background: var(--taupe);
+  cursor: not-allowed;
+}
+
+.survey-error-text {
+  font-size: 12px;
+  color: var(--danger);
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+.survey-done {
+  padding: 64px 28px;
+  text-align: center;
+}
+
+.survey-done h2 {
+  font-family: 'Lora', serif;
+  font-weight: 600;
+  font-size: 22px;
+  margin: 16px 0 10px;
+  color: var(--burgundy);
+}
+
+.survey-done p {
+  font-size: 14.5px;
+  color: var(--burgundy-2);
+  max-width: 42ch;
+  margin: 0 auto;
+  line-height: 1.65;
+}
+
+@media (max-width: 480px) {
+  .survey-body {
+    padding: 24px 12px 60px;
+  }
+  .survey-hero,
+  .survey-q,
+  .survey-footer,
+  .survey-leader {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+  .survey-hero h1 {
+    font-size: 22px;
+  }
+}
