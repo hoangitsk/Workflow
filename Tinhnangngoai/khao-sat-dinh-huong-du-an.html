@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Khảo sát — Định hướng dự án, cách xây dựng ý tưởng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500&family=Be+Vietnam+Pro:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --burgundy:#381412;
+    --burgundy-2:#552824;
+    --burgundy-3:#734D44;
+    --cream:#F1E7DC;
+    --cream-2:#FBF6EF;
+    --behong:#E4C7B5;
+    --taupe:#C8A898;
+    --line:#271E1B;
+    --shadow:#1A0A07;
+    --danger:#8C2B22;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--cream);
+    color:var(--burgundy);
+    font-family:'Be Vietnam Pro', sans-serif;
+    line-height:1.6;
+    padding:48px 20px 80px;
+  }
+  .sheet{
+    max-width:640px;
+    margin:0 auto;
+    background:var(--cream-2);
+    border:1px solid var(--behong);
+    border-radius:2px;
+  }
+  .leader{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:14px 28px;
+    border-bottom:1px solid var(--behong);
+    font-size:12px;
+    letter-spacing:.02em;
+    color:var(--burgundy-3);
+  }
+  .leader span{display:flex;align-items:center;gap:6px;}
+  .dot{width:5px;height:5px;border-radius:50%;background:var(--taupe);display:inline-block;}
+  header.hero{
+    padding:36px 28px 28px;
+    border-bottom:1px solid var(--behong);
+  }
+  .kicker{
+    font-size:13px;
+    color:var(--burgundy-3);
+    margin:0 0 10px;
+  }
+  h1{
+    font-family:'Lora', serif;
+    font-weight:600;
+    font-size:26px;
+    line-height:1.3;
+    margin:0 0 14px;
+    color:var(--burgundy);
+  }
+  .intro{
+    font-size:15px;
+    color:var(--burgundy-2);
+    max-width:52ch;
+    margin:0;
+  }
+  form{padding:0;}
+  .q{
+    padding:28px;
+    border-bottom:1px solid var(--behong);
+  }
+  .q-num{
+    font-family:'Lora', serif;
+    font-style:italic;
+    font-size:13px;
+    color:var(--taupe);
+    display:block;
+    margin-bottom:8px;
+  }
+  .q-title{
+    font-size:16px;
+    font-weight:500;
+    margin:0 0 4px;
+    color:var(--burgundy);
+  }
+  .q-hint{
+    font-size:13px;
+    color:var(--burgundy-3);
+    margin:0 0 16px;
+  }
+  .scale{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .scale label{
+    flex:1;
+    min-width:88px;
+    text-align:center;
+    border:1px solid var(--taupe);
+    padding:10px 6px;
+    font-size:13px;
+    color:var(--burgundy-2);
+    cursor:pointer;
+    user-select:none;
+    background:transparent;
+    transition:background .12s ease, color .12s ease, border-color .12s ease;
+  }
+  .scale input{
+    position:absolute;
+    opacity:0;
+    width:1px;height:1px;
+  }
+  .scale input:checked + label{
+    background:var(--burgundy);
+    border-color:var(--burgundy);
+    color:var(--cream-2);
+  }
+  .scale label:hover{border-color:var(--burgundy-2);}
+  .scale-labels{
+    display:flex;
+    justify-content:space-between;
+    font-size:11px;
+    color:var(--burgundy-3);
+    margin-top:6px;
+  }
+  textarea, input[type="text"], input[type="email"], input[type="tel"]{
+    width:100%;
+    font-family:'Be Vietnam Pro', sans-serif;
+    font-size:14px;
+    color:var(--burgundy);
+    background:#fff;
+    border:1px solid var(--taupe);
+    border-radius:2px;
+    padding:10px 12px;
+    resize:vertical;
+  }
+  textarea:focus, input:focus{outline:none;border-color:var(--burgundy);}
+  textarea{min-height:80px;}
+  .choice-list{display:flex;flex-direction:column;gap:8px;}
+  .choice{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    border:1px solid var(--taupe);
+    padding:12px 14px;
+    cursor:pointer;
+    transition:border-color .12s ease, background .12s ease;
+  }
+  .choice:hover{border-color:var(--burgundy-2);}
+  .choice input{margin-top:3px;}
+  .choice.checked{border-color:var(--burgundy);background:var(--behong);}
+  .choice-text{font-size:14px;color:var(--burgundy-2);}
+  .field{margin-top:12px;}
+  .field label{
+    display:block;
+    font-size:12px;
+    color:var(--burgundy-3);
+    margin-bottom:5px;
+  }
+  .contact-block{
+    margin-top:18px;
+    padding-top:18px;
+    border-top:1px dashed var(--taupe);
+    display:none;
+  }
+  .contact-block.show{display:block;}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media (max-width:480px){.grid-2{grid-template-columns:1fr;}}
+  .footer{
+    padding:28px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    align-items:flex-start;
+  }
+  button.submit{
+    font-family:'Be Vietnam Pro', sans-serif;
+    font-size:14px;
+    font-weight:500;
+    color:var(--cream-2);
+    background:var(--burgundy);
+    border:none;
+    padding:13px 26px;
+    cursor:pointer;
+    border-radius:2px;
+    transition:background .12s ease;
+  }
+  button.submit:hover{background:var(--burgundy-2);}
+  button.submit:disabled{background:var(--taupe);cursor:default;}
+  .error-text{
+    font-size:12px;
+    color:var(--danger);
+    margin-top:6px;
+    display:none;
+  }
+  .error-text.show{display:block;}
+  .privacy-note{
+    font-size:11.5px;
+    color:var(--burgundy-3);
+  }
+  .done{
+    display:none;
+    padding:60px 28px;
+    text-align:center;
+  }
+  .done.show{display:block;}
+  .done h2{
+    font-family:'Lora', serif;
+    font-weight:600;
+    font-size:22px;
+    margin:0 0 10px;
+  }
+  .done p{font-size:14px;color:var(--burgundy-2);max-width:40ch;margin:0 auto;}
+  .admin{
+    display:none;
+    max-width:640px;
+    margin:32px auto 0;
+    padding:24px 28px;
+    background:var(--cream-2);
+    border:1px solid var(--behong);
+    font-size:13px;
+  }
+  .admin.show{display:block;}
+  .admin h3{font-family:'Lora', serif;font-size:16px;margin:0 0 12px;}
+  .admin-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--cream);}
+  .admin-comment{padding:10px 0;border-bottom:1px solid var(--cream);color:var(--burgundy-2);}
+</style>
+</head>
+<body>
+
+<div class="sheet">
+  <div class="leader">
+    <span><span class="dot"></span>Ý NIỆM ĐIỆN ẢNH</span>
+    <span>Khảo sát buổi học</span>
+  </div>
+  <header class="hero">
+    <p class="kicker">Buổi học đầu tiên · Định hướng dự án, cách xây dựng ý tưởng</p>
+    <h1>Buổi học đầu tiên đã khép lại — còn bạn thì sao?</h1>
+    <p class="intro">Vài câu hỏi ngắn để tụi mình biết buổi học đầu tiên này có giúp ích được gì, và quan trọng hơn — liệu bạn có muốn tiếp tục đồng hành cùng các buổi học và dự án tiếp theo hay không. Mất khoảng 3 phút.</p>
+  </header>
+
+  <form id="surveyForm">
+    <div class="q">
+      <span class="q-num">01</span>
+      <p class="q-title">Nội dung buổi học rõ ràng, dễ hiểu</p>
+      <div class="scale" data-name="clarity">
+        <input type="radio" name="clarity" value="1" id="clarity-1"><label for="clarity-1">1</label>
+        <input type="radio" name="clarity" value="2" id="clarity-2"><label for="clarity-2">2</label>
+        <input type="radio" name="clarity" value="3" id="clarity-3"><label for="clarity-3">3</label>
+        <input type="radio" name="clarity" value="4" id="clarity-4"><label for="clarity-4">4</label>
+        <input type="radio" name="clarity" value="5" id="clarity-5"><label for="clarity-5">5</label>
+      </div>
+      <div class="scale-labels"><span>Không rõ lắm</span><span>Rất rõ ràng</span></div>
+    </div>
+
+    <div class="q">
+      <span class="q-num">02</span>
+      <p class="q-title">Buổi học giúp bạn hình dung được cách xây dựng ý tưởng cho dự án của mình</p>
+      <div class="scale" data-name="usefulness">
+        <input type="radio" name="usefulness" value="1" id="usefulness-1"><label for="usefulness-1">1</label>
+        <input type="radio" name="usefulness" value="2" id="usefulness-2"><label for="usefulness-2">2</label>
+        <input type="radio" name="usefulness" value="3" id="usefulness-3"><label for="usefulness-3">3</label>
+        <input type="radio" name="usefulness" value="4" id="usefulness-4"><label for="usefulness-4">4</label>
+        <input type="radio" name="usefulness" value="5" id="usefulness-5"><label for="usefulness-5">5</label>
+      </div>
+      <div class="scale-labels"><span>Chưa hình dung được</span><span>Rất hữu ích</span></div>
+    </div>
+
+    <div class="q">
+      <span class="q-num">03</span>
+      <p class="q-title">Người hướng dẫn trình bày dễ tiếp cận, giải đáp thắc mắc tốt</p>
+      <div class="scale" data-name="facilitator">
+        <input type="radio" name="facilitator" value="1" id="facilitator-1"><label for="facilitator-1">1</label>
+        <input type="radio" name="facilitator" value="2" id="facilitator-2"><label for="facilitator-2">2</label>
+        <input type="radio" name="facilitator" value="3" id="facilitator-3"><label for="facilitator-3">3</label>
+        <input type="radio" name="facilitator" value="4" id="facilitator-4"><label for="facilitator-4">4</label>
+        <input type="radio" name="facilitator" value="5" id="facilitator-5"><label for="facilitator-5">5</label>
+      </div>
+      <div class="scale-labels"><span>Khó tiếp cận</span><span>Rất dễ tiếp cận</span></div>
+    </div>
+
+    <div class="q">
+      <span class="q-num">04</span>
+      <p class="q-title">Mức độ hài lòng chung của bạn về buổi học <span style="color:var(--danger)">*</span></p>
+      <div class="scale" data-name="satisfaction">
+        <input type="radio" name="satisfaction" value="1" id="satisfaction-1" required><label for="satisfaction-1">1</label>
+        <input type="radio" name="satisfaction" value="2" id="satisfaction-2"><label for="satisfaction-2">2</label>
+        <input type="radio" name="satisfaction" value="3" id="satisfaction-3"><label for="satisfaction-3">3</label>
+        <input type="radio" name="satisfaction" value="4" id="satisfaction-4"><label for="satisfaction-4">4</label>
+        <input type="radio" name="satisfaction" value="5" id="satisfaction-5"><label for="satisfaction-5">5</label>
+      </div>
+      <div class="scale-labels"><span>Chưa hài lòng</span><span>Rất hài lòng</span></div>
+      <p class="error-text" id="err-satisfaction">Chọn một mức độ trước khi gửi nhé.</p>
+    </div>
+
+    <div class="q">
+      <span class="q-num">05</span>
+      <p class="q-title">Điều gì trong buổi học khiến bạn tâm đắc nhất?</p>
+      <textarea name="highlight" placeholder="Một ý, một ví dụ, hay một cách nghĩ nào đó đã đọng lại..."></textarea>
+    </div>
+
+    <div class="q">
+      <span class="q-num">06</span>
+      <p class="q-title">Điều gì bạn thấy còn chưa rõ, hoặc muốn được bổ sung thêm?</p>
+      <textarea name="gap" placeholder="Có thể là một phần nội dung, một kỹ năng, hoặc đơn giản là cần thêm ví dụ..."></textarea>
+    </div>
+
+    <div class="q">
+      <span class="q-num">07</span>
+      <p class="q-title">Sau buổi học đầu tiên này, bạn có muốn tiếp tục tham gia các buổi học và dự án tiếp theo không? <span style="color:var(--danger)">*</span></p>
+      <p class="q-hint">Chọn phương án gần với suy nghĩ hiện tại của bạn nhất.</p>
+      <div class="choice-list" id="continueGroup">
+        <label class="choice">
+          <input type="radio" name="continue_project" value="Có, chắc chắn rồi" required>
+          <span class="choice-text">Có, chắc chắn rồi — mình muốn tham gia các buổi tiếp theo</span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="continue_project" value="Có, nhưng cần thêm thông tin">
+          <span class="choice-text">Có, nhưng cần biết thêm thông tin trước khi quyết định</span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="continue_project" value="Chưa chắc, cần thời gian">
+          <span class="choice-text">Chưa chắc — cần thêm thời gian suy nghĩ</span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="continue_project" value="Không, chưa phù hợp lúc này">
+          <span class="choice-text">Không, hiện tại chưa phù hợp với mình</span>
+        </label>
+      </div>
+      <p class="error-text" id="err-continue">Chọn một phương án trước khi gửi nhé.</p>
+
+      <div class="field">
+        <label for="reason">Vì sao bạn chọn phương án đó? (không bắt buộc)</label>
+        <textarea id="reason" name="reason" placeholder="Chia sẻ ngắn gọn lý do..."></textarea>
+      </div>
+
+      <div class="contact-block" id="contactBlock">
+        <p class="q-hint" style="margin-bottom:12px;">Để lại thông tin để Ban tổ chức liên hệ với bạn về các bước tiếp theo.</p>
+        <div class="grid-2">
+          <div class="field">
+            <label for="fullname">Họ và tên</label>
+            <input type="text" id="fullname" name="fullname" placeholder="Nguyễn Văn A">
+          </div>
+          <div class="field">
+            <label for="school">Trường / lớp</label>
+            <input type="text" id="school" name="school" placeholder="THPT ...">
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="phone">Số điện thoại / Zalo</label>
+            <input type="tel" id="phone" name="phone" placeholder="09xx xxx xxx">
+          </div>
+          <div class="field">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" placeholder="ten@email.com">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <button type="submit" class="submit" id="submitBtn">Gửi khảo sát</button>
+      <p class="privacy-note">Phản hồi của bạn được dùng nội bộ để cải thiện các buổi học tiếp theo của Ý Niệm Điện Ảnh.</p>
+    </div>
+  </form>
+
+  <div class="done" id="doneScreen">
+    <h2>Cảm ơn bạn đã chia sẻ</h2>
+    <p>Phản hồi của bạn đã được ghi nhận. Nếu bạn chọn tiếp tục đồng hành, tụi mình sẽ liên hệ sớm nhé.</p>
+  </div>
+</div>
+
+<div class="admin" id="adminPanel">
+  <h3>Tổng hợp (dành cho ban tổ chức)</h3>
+  <div id="adminContent">Đang tải...</div>
+</div>
+
+<script>
+(function(){
+  const form = document.getElementById('surveyForm');
+  const doneScreen = document.getElementById('doneScreen');
+  const contactBlock = document.getElementById('contactBlock');
+  const continueGroup = document.getElementById('continueGroup');
+  const submitBtn = document.getElementById('submitBtn');
+
+  document.querySelectorAll('.choice input').forEach(function(input){
+    input.addEventListener('change', function(){
+      document.querySelectorAll('.choice').forEach(function(c){ c.classList.remove('checked'); });
+      input.closest('.choice').classList.add('checked');
+      contactBlock.classList.toggle('show', input.value.indexOf('Có') === 0);
+    });
+  });
+
+  form.addEventListener('submit', async function(e){
+    e.preventDefault();
+    let valid = true;
+
+    const satisfaction = form.querySelector('input[name="satisfaction"]:checked');
+    document.getElementById('err-satisfaction').classList.toggle('show', !satisfaction);
+    if(!satisfaction) valid = false;
+
+    const cont = form.querySelector('input[name="continue_project"]:checked');
+    document.getElementById('err-continue').classList.toggle('show', !cont);
+    if(!cont) valid = false;
+
+    if(!valid) return;
+
+    const fd = new FormData(form);
+    const data = {};
+    fd.forEach(function(v,k){ data[k] = v; });
+    data.submitted_at = new Date().toISOString();
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Đang gửi...';
+
+    try{
+      const key = 'response:' + Date.now() + ':' + Math.random().toString(36).slice(2,8);
+      const result = await window.storage.set(key, JSON.stringify(data), true);
+      if(!result){
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Gửi khảo sát';
+        alert('Có lỗi khi gửi khảo sát, bạn thử lại nhé.');
+        return;
+      }
+    }catch(err){
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Gửi khảo sát';
+      alert('Có lỗi khi gửi khảo sát, bạn thử lại nhé.');
+      return;
+    }
+
+    form.style.display = 'none';
+    doneScreen.classList.add('show');
+  });
+
+  if(window.location.hash === '#admin'){
+    loadAdmin();
+  }
+
+  async function loadAdmin(){
+    const panel = document.getElementById('adminPanel');
+    const content = document.getElementById('adminContent');
+    panel.classList.add('show');
+    try{
+      const list = await window.storage.list('response:', true);
+      if(!list || !list.keys || list.keys.length === 0){
+        content.textContent = 'Chưa có phản hồi nào.';
+        return;
+      }
+      const rows = [];
+      for(const k of list.keys){
+        try{
+          const r = await window.storage.get(k, true);
+          if(r && r.value) rows.push(JSON.parse(r.value));
+        }catch(e){}
+      }
+      const total = rows.length;
+      const avg = function(field){
+        const nums = rows.map(r => Number(r[field])).filter(n => !isNaN(n));
+        if(nums.length === 0) return '—';
+        return (nums.reduce((a,b)=>a+b,0) / nums.length).toFixed(1);
+      };
+      const counts = {};
+      rows.forEach(function(r){
+        const c = r.continue_project || 'Không rõ';
+        counts[c] = (counts[c] || 0) + 1;
+      });
+
+      let html = '';
+      html += '<div class="admin-row"><span>Tổng số phản hồi</span><strong>' + total + '</strong></div>';
+      html += '<div class="admin-row"><span>Điểm rõ ràng nội dung (TB)</span><strong>' + avg('clarity') + '</strong></div>';
+      html += '<div class="admin-row"><span>Điểm hữu ích (TB)</span><strong>' + avg('usefulness') + '</strong></div>';
+      html += '<div class="admin-row"><span>Điểm người hướng dẫn (TB)</span><strong>' + avg('facilitator') + '</strong></div>';
+      html += '<div class="admin-row"><span>Hài lòng chung (TB)</span><strong>' + avg('satisfaction') + '</strong></div>';
+      html += '<h3 style="margin-top:20px;">Muốn tiếp tục dự án?</h3>';
+      Object.keys(counts).forEach(function(c){
+        html += '<div class="admin-row"><span>' + c + '</span><strong>' + counts[c] + '</strong></div>';
+      });
+      const comments = rows.filter(r => r.reason && r.reason.trim()).map(r => r.reason);
+      if(comments.length){
+        html += '<h3 style="margin-top:20px;">Lý do (trích)</h3>';
+        comments.forEach(function(c){
+          html += '<div class="admin-comment">' + c.replace(/</g,'&lt;') + '</div>';
+        });
+      }
+      content.innerHTML = html;
+    }catch(err){
+      content.textContent = 'Không tải được dữ liệu.';
+    }
+  }
+})();
+</script>
+
+</body>
+</html>
