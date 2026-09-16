@@ -13,7 +13,8 @@ import {
 import { 
   toggleDiscordMuteAction, testDiscordWebhookAction 
 } from "../../actions/notification-actions";
-import { updateSettingsAction, removeMemberAction } from "../../actions/admin-actions";
+import { updateSettingsAction, removeMemberAction, updateChannelTopicBranchAction } from "../../actions/admin-actions";
+import { updateIdeaPlatformChannelAction } from "../../actions/idea-actions";
 
 interface ControlPanelViewProps {
   settings: AppSettings;
@@ -57,6 +58,40 @@ export default function ControlPanelView({
   const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
   const [showMemberList, setShowMemberList] = useState(false);
   const [isDeletingMember, setIsDeletingMember] = useState(false);
+
+  const [expandedChannels, setExpandedChannels] = useState<Record<string, boolean>>({});
+  const toggleChannelExpand = (id: string) => setExpandedChannels(prev => ({...prev, [id]: !prev[id]}));
+
+  const handleDropChannelToBranch = (e: React.DragEvent, targetBranch: string) => {
+    e.preventDefault();
+    const type = e.dataTransfer.getData('drag-type');
+    if (type === 'channel' && isCore) {
+      const channelId = e.dataTransfer.getData('channel-id');
+      if (channelId) {
+        runAction(async () => {
+          await updateChannelTopicBranchAction(channelId, targetBranch);
+          showToast(`Đã chuyển kênh sang nhánh ${targetBranch}`);
+        });
+      }
+    }
+  };
+
+  const handleDropIdeaToChannel = (e: React.DragEvent, targetChannelId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const type = e.dataTransfer.getData('drag-type');
+    if (type === 'idea') {
+      const ideaId = e.dataTransfer.getData('idea-id');
+      const pcs = platformChannels.filter(pc => pc.channelGroupId === targetChannelId);
+      if (pcs.length > 0) {
+        const targetPc = pcs.find(pc => pc.platformId === 'plat_yt') || pcs[0];
+        runAction(async () => {
+          await updateIdeaPlatformChannelAction(ideaId, targetPc.id);
+          showToast(`Đã chuyển ý tưởng sang kênh mới!`);
+        });
+      }
+    }
+  };
 
   const handleConfirmDeleteMember = async () => {
     if (!memberToDelete || !isCore) return;
@@ -431,7 +466,12 @@ export default function ControlPanelView({
         ) : (
           <div className="space-y-5">
             {Array.from(topicMap.entries()).map(([branchName, branchChannels]) => (
-              <div key={branchName} className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-3">
+              <div 
+                key={branchName} 
+                className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-3"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => handleDropChannelToBranch(e, branchName)}
+              >
                 
                 {/* Branch Header */}
                 <div className="flex items-center justify-between gap-2">
@@ -459,7 +499,14 @@ export default function ControlPanelView({
                     return (
                       <div 
                         key={cg.id}
-                        className="bg-white rounded-lg border border-slate-200 p-3.5 shadow-2xs hover:border-indigo-300 transition-all space-y-3 flex flex-col justify-between">
+                        draggable={isCore}
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData('drag-type', 'channel');
+                          e.dataTransfer.setData('channel-id', cg.id);
+                        }}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => handleDropIdeaToChannel(e, cg.id)}
+                        className={`bg-white rounded-lg border border-slate-200 p-3.5 shadow-2xs hover:border-indigo-300 transition-all space-y-3 flex flex-col justify-between ${isCore ? 'cursor-grab active:cursor-grabbing' : ''}`}>
                         
                         <div>
                           {/* Channel Title & Color Bar */}
@@ -536,12 +583,42 @@ export default function ControlPanelView({
                           </div>
 
                           {/* Ideas in progress */}
-                          <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                            <span>Đang xử lý: <strong className="text-slate-800">{activeIdeasCount} video</strong></span>
-                            {cg.discordWebhookUrl && (
-                              <span className="text-[10px] text-indigo-600 font-medium flex items-center gap-1" title="Có Discord Thread/Webhook riêng">
-                                <Hash size={10} /> Thread riêng
-                              </span>
+                          <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
+                            <div className="flex items-center justify-between text-[11px] text-slate-500">
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); toggleChannelExpand(cg.id); }}
+                                className="flex items-center gap-1 hover:text-slate-800 transition-colors"
+                              >
+                                <span>Đang xử lý: <strong className="text-slate-800">{activeIdeasCount} video</strong></span>
+                                <span className="text-[9px] px-1 py-0.5 rounded bg-slate-100">{expandedChannels[cg.id] ? "Ẩn" : "Xem"}</span>
+                              </button>
+                              {cg.discordWebhookUrl && (
+                                <span className="text-[10px] text-indigo-600 font-medium flex items-center gap-1" title="Có Discord Thread/Webhook riêng">
+                                  <Hash size={10} /> Thread riêng
+                                </span>
+                              )}
+                            </div>
+                            
+                            {expandedChannels[cg.id] && channelIdeas.length > 0 && (
+                              <div className="mt-2 space-y-1.5 max-h-40 overflow-y-auto pr-1 no-scrollbar">
+                                {channelIdeas.map(idea => (
+                                  <div 
+                                    key={idea.id}
+                                    draggable
+                                    onDragStart={(e) => {
+                                      e.stopPropagation();
+                                      e.dataTransfer.setData('drag-type', 'idea');
+                                      e.dataTransfer.setData('idea-id', idea.id);
+                                    }}
+                                    className="p-1.5 rounded border border-slate-200 bg-slate-50 text-[10px] hover:bg-slate-100 transition-colors cursor-grab active:cursor-grabbing flex items-center justify-between group"
+                                  >
+                                    <span className="truncate font-medium text-slate-700 pr-2">{idea.title}</span>
+                                    <span className="shrink-0 text-[8px] px-1 py-0.5 bg-white border border-slate-200 rounded text-slate-500">
+                                      {idea.status}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
                             )}
                           </div>
                         </div>

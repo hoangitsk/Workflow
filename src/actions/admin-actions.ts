@@ -477,3 +477,14 @@ export async function updateSettingsAction(
 }
 
 
+
+export async function updateChannelTopicBranchAction(channelGroupId: string, topicBranch: string) {
+  const { getCurrentMember } = await import("./auth-actions");
+  const member = await getCurrentMember();
+  if (!member || member.role !== "Core") throw new Error("Unauthorized");
+  const { getDb } = await import("../lib/db");
+  const sql = getDb();
+  await sql.query("UPDATE channel_groups SET topic_branch = $1 WHERE id = $2", [topicBranch.trim(), channelGroupId]);
+  const { revalidatePath } = await import("next/cache");
+  revalidatePath("/");
+}

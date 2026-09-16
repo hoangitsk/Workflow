@@ -1820,3 +1820,14 @@ export async function triggerDailyCronAction() {
   return { success: true };
 }
 
+
+export async function updateIdeaPlatformChannelAction(ideaId: string, platformChannelId: string) {
+  const { getCurrentMember } = await import("./auth-actions");
+  const member = await getCurrentMember();
+  if (!member || member.role !== "Core") throw new Error("Unauthorized");
+  const { getDb } = await import("../lib/db");
+  const sql = getDb();
+  await sql.query("UPDATE ideas SET platform_channel_id = $1 WHERE id = $2", [platformChannelId, ideaId]);
+  const { revalidatePath } = await import("next/cache");
+  revalidatePath("/");
+}
