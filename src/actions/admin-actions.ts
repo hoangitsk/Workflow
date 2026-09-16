@@ -402,6 +402,10 @@ export async function removeMemberAction(memberEmailToRemove: string) {
   if (!member) throw new Error("Chưa đăng nhập");
   if (member.role !== "Core") throw new Error("Chỉ Core mới có quyền xoá thành viên");
 
+  if (memberEmailToRemove === member.id) {
+    throw new Error("Bạn không thể tự xoá tài khoản của chính mình");
+  }
+
   const sql = getDb();
   
   const activeAssignedRes = await sql.query(

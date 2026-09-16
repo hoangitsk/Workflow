@@ -2436,11 +2436,28 @@ export default function ClientApp({
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-slate-100">
-            {(actor.role === "Core" || actor.id === showProfile.id) && (
-              <Btn tone="primary" onClick={() => { setEditProfile(showProfile); setShowProfile(null); }}>Chỉnh sửa hồ sơ</Btn>
-            )}
-            <Btn onClick={() => setShowProfile(null)}>Đóng</Btn>
+          <div className="flex justify-between items-center gap-2 mt-5 pt-3 border-t border-slate-100">
+            {actor.role === "Core" && showProfile.id !== actor.id ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const target = showProfile;
+                  setShowProfile(null);
+                  if (window.confirm(`Bạn có chắc muốn xoá vĩnh viễn thành viên "${target.name}"?`)) {
+                    runAction(removeMemberAction, target.id);
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors">
+                <Trash2 size={13} /> Xoá thành viên
+              </button>
+            ) : <div />}
+
+            <div className="flex items-center gap-2">
+              {(actor.role === "Core" || actor.id === showProfile.id) && (
+                <Btn tone="primary" onClick={() => { setEditProfile(showProfile); setShowProfile(null); }}>Chỉnh sửa hồ sơ</Btn>
+              )}
+              <Btn onClick={() => setShowProfile(null)}>Đóng</Btn>
+            </div>
           </div>
         </Modal>
       )}
@@ -4709,6 +4726,18 @@ function MembersAndAuditView({
                 <RoleChip role={m.role} />
                 {!m.active && (
                   <span className="text-[9px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">Ngừng HĐ</span>
+                )}
+                {actor.role === "Core" && m.id !== actor.id && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveMember(m);
+                    }}
+                    title={`Xoá thành viên ${m.name}`}
+                    className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors">
+                    <Trash2 size={13} />
+                  </button>
                 )}
               </div>
             </div>

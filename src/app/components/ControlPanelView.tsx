@@ -13,7 +13,7 @@ import {
 import { 
   toggleDiscordMuteAction, testDiscordWebhookAction 
 } from "../../actions/notification-actions";
-import { updateSettingsAction } from "../../actions/admin-actions";
+import { updateSettingsAction, removeMemberAction } from "../../actions/admin-actions";
 
 interface ControlPanelViewProps {
   settings: AppSettings;
@@ -54,6 +54,25 @@ export default function ControlPanelView({
   const [calendarUrl, setCalendarUrl] = useState(settings.externalCalendarUrl || "");
   const [testingWebhook, setTestingWebhook] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
+  const [showMemberList, setShowMemberList] = useState(false);
+  const [isDeletingMember, setIsDeletingMember] = useState(false);
+
+  const handleConfirmDeleteMember = async () => {
+    if (!memberToDelete || !isCore) return;
+    setIsDeletingMember(true);
+    runAction(async () => {
+      try {
+        await removeMemberAction(memberToDelete.id);
+        showToast(`Đã xoá thành viên "${memberToDelete.name}" thành công!`);
+        setMemberToDelete(null);
+      } catch (err: any) {
+        alert(err.message || "Không thể xoá thành viên");
+      } finally {
+        setIsDeletingMember(false);
+      }
+    });
+  };
 
   // Group channels by Topic Branch
   const topicMap = new Map<string, ChannelGroup[]>();
@@ -575,14 +594,24 @@ export default function ControlPanelView({
           </div>
         </div>
 
-        {/* Team Members Summary */}
+        {/* Team Members Summary & Deletion */}
         <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
               <Users size={14} className="text-indigo-600" />
               Đội Ngũ Nhân Sự
             </h3>
-            <span className="text-xs font-bold text-slate-700">{members.filter(m => m.active).length} Hoạt động</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-700">{members.filter(m => m.active).length} Hoạt động</span>
+              {isCore && (
+                <button
+                  type="button"
+                  onClick={() => setShowMemberList(!showMemberList)}
+                  className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
+                  {showMemberList ? "Thu gọn" : "Quản lý / Xoá"}
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2 text-xs">
@@ -600,8 +629,53 @@ export default function ControlPanelView({
             </div>
           </div>
 
+          {/* Expandable Member List for Quick Deletion */}
+          {showMemberList && (
+            <div className="mt-3 pt-3 border-t border-slate-100 space-y-2 max-h-60 overflow-y-auto pr-1">
+              <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Danh sách thành viên ({members.length})
+              </div>
+              {members.map((m) => {
+                const isSelf = m.id === actor.id;
+                const activeTasks = ideas.filter(i => i.assignedToEmail === m.id && i.status !== "COMPLETE" && i.status !== "CANCELLED" && i.status !== "ARCHIVED_IDEA").length;
+
+                return (
+                  <div 
+                    key={m.id}
+                    className="flex items-center justify-between gap-2 p-2 rounded-lg bg-slate-50/80 border border-slate-200 text-xs">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-slate-900 truncate flex items-center gap-1.5">
+                        <span className="truncate">{m.name}</span>
+                        {isSelf && (
+                          <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-700 font-bold shrink-0">Bạn</span>
+                        )}
+                        <span className="text-[10px] text-slate-500 font-normal">({m.role})</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 truncate">{m.id}</div>
+                      {activeTasks > 0 && (
+                        <div className="text-[10px] text-amber-600 font-medium mt-0.5">
+                          Đang phụ trách {activeTasks} task
+                        </div>
+                      )}
+                    </div>
+
+                    {isCore && !isSelf && (
+                      <button
+                        type="button"
+                        onClick={() => setMemberToDelete(m)}
+                        title={`Xoá thành viên ${m.name}`}
+                        className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0">
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           <p className="text-[11px] text-slate-400 pt-1">
-            * Để thêm bớt nhân sự hoặc phân quyền, hãy vào tab <b>Đội ngũ & Audit Log</b>.
+            * Nhấn <b>Quản lý / Xoá</b> để xoá nhanh thành viên hoặc vào tab <b>Đội ngũ & Audit Log</b> để xem chi tiết.
           </p>
         </div>
 
@@ -635,6 +709,52 @@ export default function ControlPanelView({
         </div>
 
       </div>
+
+      {/* CONFIRM DELETE MEMBER MODAL */}
+      {memberToDelete && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl border border-slate-200 p-5 max-w-md w-full saas-shadow-lg space-y-4">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-slate-900">Xác nhận xoá thành viên</h3>
+                <p className="text-xs text-slate-500">Hành động này sẽ xoá tài khoản vĩnh viễn khỏi hệ thống.</p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1">
+              <div>Họ tên: <strong className="text-slate-900">{memberToDelete.name}</strong></div>
+              <div>Email: <strong className="text-slate-900 font-mono">{memberToDelete.id}</strong></div>
+              <div>Vai trò: <span className="font-semibold text-slate-800">{memberToDelete.role}</span></div>
+            </div>
+
+            {ideas.filter(i => i.assignedToEmail === memberToDelete.id && i.status !== "COMPLETE" && i.status !== "CANCELLED" && i.status !== "ARCHIVED_IDEA").length > 0 && (
+              <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+                ⚠️ Thành viên này hiện đang phụ trách ý tưởng/video chưa hoàn thành. Bạn cần gán lại cho người khác trước khi xoá!
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setMemberToDelete(null)}
+                disabled={isDeletingMember}
+                className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-medium transition-colors">
+                Huỷ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteMember}
+                disabled={isDeletingMember}
+                className="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5">
+                <Trash2 size={13} /> {isDeletingMember ? "Đang xoá..." : "Xác nhận xoá"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
