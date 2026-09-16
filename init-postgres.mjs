@@ -257,6 +257,9 @@ async function initSchema() {
   try {
     await sql.query(`ALTER TABLE channel_groups ADD COLUMN video_format TEXT;`);
   } catch (e) { /* ignores if exists */ }
+  try {
+    await sql.query(`ALTER TABLE channel_groups ADD COLUMN topic_branch TEXT;`);
+  } catch (e) { /* ignores if exists */ }
 
   // SOP Migrations for existing databases
   const sopMigrations = [

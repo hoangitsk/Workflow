@@ -77,6 +77,7 @@ export async function ensureSchema(sql: any): Promise<void> {
         'ALTER TABLE channel_groups ADD COLUMN IF NOT EXISTS reference_video_link TEXT;',
         'ALTER TABLE channel_groups ADD COLUMN IF NOT EXISTS video_format TEXT;',
         'ALTER TABLE channel_groups ADD COLUMN IF NOT EXISTS discord_webhook_url TEXT;',
+        'ALTER TABLE channel_groups ADD COLUMN IF NOT EXISTS topic_branch TEXT;',
         // SOP Gating and State Machine (R2)
         "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS active_gate VARCHAR(50) DEFAULT 'GATE_1_IDEA';",
         "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS gate1_approved_at VARCHAR(100);",
@@ -183,7 +184,7 @@ export async function getAllData(): Promise<{
       auditLogs: [],
       notifications: [],
       checklists: [],
-      settings: { discordWebhookUrl: '', discordIdeaWebhookUrl: '', externalCalendarUrl: '' },
+      settings: { discordWebhookUrl: '', discordIdeaWebhookUrl: '', externalCalendarUrl: '', discordMuted: false },
       pitchingBatches: []
     };
   }
@@ -253,7 +254,8 @@ export async function getAllData(): Promise<{
     description: r.description || '',
     referenceVideoLink: r.reference_video_link || '',
     videoFormat: r.video_format || '',
-    discordWebhookUrl: r.discord_webhook_url || ''
+    discordWebhookUrl: r.discord_webhook_url || '',
+    topicBranch: r.topic_branch || ''
   }));
 
   const platformChannels: PlatformChannel[] = (platformChannelsRows || []).map((r: any) => ({
@@ -403,11 +405,12 @@ export async function getAllData(): Promise<{
     createdByEmail: r.created_by_email || ''
   }));
 
-  const settings: AppSettings = { discordWebhookUrl: '', discordIdeaWebhookUrl: '', externalCalendarUrl: '' };
+  const settings: AppSettings = { discordWebhookUrl: '', discordIdeaWebhookUrl: '', externalCalendarUrl: '', discordMuted: false };
   for (const r of ((settingsRows as any[]) || [])) {
     if (r.key === 'discordWebhookUrl') settings.discordWebhookUrl = r.value || '';
     if (r.key === 'discordIdeaWebhookUrl') settings.discordIdeaWebhookUrl = r.value || '';
     if (r.key === 'externalCalendarUrl') settings.externalCalendarUrl = r.value || '';
+    if (r.key === 'discordMuted') settings.discordMuted = r.value === 'true';
   }
 
   const pitchingBatches: PitchingBatch[] = (pitchingBatchesRows || []).map((r: any) => ({

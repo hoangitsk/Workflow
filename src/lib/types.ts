@@ -35,6 +35,7 @@ export interface ChannelGroup {
   referenceVideoLink?: string;
   videoFormat?: string;
   discordWebhookUrl?: string;
+  topicBranch?: string;
 }
 
 export interface PlatformChannel {
@@ -298,4 +299,5 @@ export interface AppSettings {
   discordWebhookUrl: string;
   discordIdeaWebhookUrl?: string;
   externalCalendarUrl: string;
+  discordMuted?: boolean;
 }

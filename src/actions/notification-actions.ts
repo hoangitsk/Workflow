@@ -70,6 +70,13 @@ export async function sendDiscordWebhook(
 ) {
   try {
     const sql = getDb();
+
+    // Kiểm tra cờ tắt thông báo Discord (discordMuted)
+    const mutedRows = await sql.query(`SELECT value FROM settings WHERE key = 'discordMuted' LIMIT 1`);
+    if (mutedRows[0] && (mutedRows[0] as any).value === 'true') {
+      console.log("ℹ️ [Discord Notification] Thông báo Discord đang bị TẮT (discordMuted = true). Bỏ qua gửi tin.");
+      return;
+    }
     
     // Get general webhook (Kênh Task Giao Việc Tổng)
     let generalWebhookUrl = process.env.DISCORD_WEBHOOK_URL || "";
@@ -194,4 +201,46 @@ export async function markAllNotificationsAsReadAction() {
   );
   revalidatePath("/");
 }
+
+export async function toggleDiscordMuteAction(muted: boolean) {
+  const current = await getCurrentMember();
+  if (!current) throw new Error("Chưa đăng nhập");
+  if (current.role !== "Core") throw new Error("Chỉ Core mới có quyền bật/tắt thông báo hệ thống");
+
+  const sql = getDb();
+  await sql.query(
+    `INSERT INTO settings (key, value) VALUES ('discordMuted', $1)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [muted ? 'true' : 'false']
+  );
+  revalidatePath("/");
+  return { success: true, muted };
+}
+
+export async function testDiscordWebhookAction(customUrl?: string) {
+  const current = await getCurrentMember();
+  if (!current) throw new Error("Chưa đăng nhập");
+  if (current.role !== "Core") throw new Error("Chỉ Core mới có quyền thử nghiệm webhook");
+
+  const now = new Date();
+  const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')} - ${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
+
+  const message = `🔔 **[TEST THÔNG BÁO TỪ TRANG ĐIỀU KHIỂN]**\n> 👤 **Người gửi:** ${current.name} (${current.role})\n> ⏰ **Thời gian:** ${timeStr}\n> ✅ **Trạng thái:** Kết nối Discord Webhook thành công! Hệ thống hoạt động bình thường.`;
+
+  const target = customUrl?.trim();
+  if (target) {
+    const res = await fetch(target, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: message })
+    });
+    if (!res.ok) {
+      throw new Error(`Gửi thử thất bại (Mã lỗi: ${res.status} ${res.statusText})`);
+    }
+  } else {
+    await sendDiscordWebhook(message, undefined, undefined, 'general', true);
+  }
+  return { success: true };
+}
+
 

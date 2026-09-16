@@ -6,12 +6,12 @@ import {
   Film, Clapperboard, Users, LayoutGrid, Calendar, FolderOpen, Award,
   Plus, X, Trash2, RotateCcw, ChevronRight, ChevronLeft, AlertTriangle,
   CheckCircle2, XCircle, Link as LinkIcon, Copy, Lightbulb, PenLine,
-  Scissors, Clapperboard as ClapIcon, ShieldCheck, Lock, LogOut, Bell,
+  Scissors, Clapperboard as ClapIcon, ShieldCheck, Lock, LogOut, Bell, BellOff,
   Search, Filter, Send, MessageSquare, ExternalLink, Settings as SettingsIcon,
   BarChart3, RefreshCw, Eye, Sparkles, Clock, Check, CalendarDays, Layers,
   Star, Video, Play, ArrowRight, Compass, ShieldAlert, Sparkle, UserCheck,
   FileText, CheckSquare, MessageCircle, MoreVertical, ChevronDown, CheckCheck,
-  Inbox, Menu, ArrowUpRight, Hash, Flame, TrendingUp, Download, Upload
+  Inbox, Menu, ArrowUpRight, Hash, Flame, TrendingUp, Download, Upload, Sliders
 } from "lucide-react";
 
 import { loginWithCredentialsAction, logoutAction, changePasswordAction } from "../../actions/auth-actions";
@@ -38,6 +38,7 @@ import { createPitchingBatchAction, closePitchingBatchAction, reopenPitchingBatc
 import { Member, Platform, ChannelGroup, PlatformChannel, Idea, CommentItem, AuditLogItem, NotificationItem, ChecklistItem, AppSettings, PitchingBatch, Role, ReferenceItem, ReferenceType } from "../../lib/types";
 import { FormattedText, ReferenceList, MultiReferenceEditor, parseReferences } from "../../lib/reference-utils";
 import ProductionTutorialView from "./ProductionTutorialView";
+import ControlPanelView from "./ControlPanelView";
 
 /* ---------------------------------------------------------------------
    LIGHT WORKSPACE DESIGN TOKENS (CLEAN & MODERN SAAS)
@@ -69,6 +70,16 @@ const C = {
 };
 
 const CHANNEL_PALETTE = ["#2563EB", "#7C3AED", "#DB2777", "#D97706", "#059669", "#0891B2"];
+
+export const SUGGESTED_TOPIC_BRANCHES = [
+  "Điện ảnh & Phân tích phim",
+  "Tâm lý học & Hành vi",
+  "Review & Đánh giá tác phẩm",
+  "Phim ngắn & Kịch bản",
+  "Tin tức & Hot Trend",
+  "Định hướng & Thương hiệu",
+  "Kiến thức & Khám phá"
+];
 
 export const CONTENT_PILLARS = [
   { value: "Branding", label: "1. Branding — Làm sáng thương hiệu", desc: "Ý niệm điện ảnh là thương hiệu gì? Core là gì? Branding thuần cho kênh -> Khẳng định giá trị." },
@@ -578,6 +589,8 @@ export default function ClientApp({
   const [cancelIdeaTarget, setCancelIdeaTarget] = useState<Idea | null>(null);
   const [schedulePostTarget, setSchedulePostTarget] = useState<Idea | null>(null);
   const [showNewChannel, setShowNewChannel] = useState(false);
+  const [newChannelTopic, setNewChannelTopic] = useState("");
+  const [newChannelPlatforms, setNewChannelPlatforms] = useState<string[]>(["plat_yt", "plat_tt"]);
   const [editChannelTarget, setEditChannelTarget] = useState<ChannelGroup | null>(null);
   const [selectedPcId, setSelectedPcId] = useState<string>("");
   const [showNewPlatform, setShowNewPlatform] = useState(false);
@@ -763,6 +776,7 @@ export default function ClientApp({
 
   const NAV_PERSONAL = [
     { id: "dashboard", label: "Việc của tôi", icon: CheckSquare, count: myActionTasks.length },
+    { id: "control", label: "Trang điều khiển", icon: Sliders, count: 0 },
     { id: "notifications_tab", label: "Inbox (Thông báo)", icon: Inbox, count: unreadNotifications.length },
   ];
 
@@ -885,18 +899,32 @@ export default function ClientApp({
         {/* BOTTOM SIDEBAR: USER PROFILE & DISCORD SYNC */}
         <div className="p-3 border-t border-[#E2E8F0] bg-white/70 space-y-2">
           {/* Discord Status */}
-          {settings.discordWebhookUrl ? (
-            <div className="flex items-center justify-between px-2 py-1 rounded-md text-[11px] bg-emerald-50 text-emerald-800 border border-emerald-200 font-medium">
+          {settings.discordMuted ? (
+            <button 
+              onClick={() => setTab("control")}
+              className="w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] bg-amber-50 text-amber-900 border border-amber-300 font-semibold hover:bg-amber-100 transition-colors"
+              title="Thông báo Discord đang bị TẮT. Bấm để mở Trang điều khiển.">
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                Discord Muted (Tắt)
+              </span>
+              <BellOff size={12} className="text-amber-700" />
+            </button>
+          ) : settings.discordWebhookUrl ? (
+            <button 
+              onClick={() => setTab("control")}
+              className="w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] bg-emerald-50 text-emerald-800 border border-emerald-200 font-medium hover:bg-emerald-100 transition-colors"
+              title="Discord đã kết nối. Bấm để mở Trang điều khiển.">
               <span className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 Discord Connected
               </span>
               <Check size={12} className="text-emerald-600" />
-            </div>
+            </button>
           ) : (
             actor.role === "Core" && (
               <button 
-                onClick={() => setShowSettingsModal(true)}
+                onClick={() => setTab("control")}
                 className="w-full flex items-center justify-center gap-1.5 px-2 py-1 rounded-md text-[11px] bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-colors font-medium">
                 <Plus size={12} /> Cài Discord Webhook
               </button>
@@ -1138,6 +1166,23 @@ export default function ClientApp({
               onQaReject={setQaRejectIdeaTarget}
               onSubmitScript={setSubmitScriptTarget}
               onSubmitVideo={setSubmitVideoTarget}
+              runAction={runAction}
+              showToast={showToast}
+            />
+          )}
+
+          {tab === "control" && (
+            <ControlPanelView 
+              settings={settings}
+              channelGroups={channelGroups}
+              platforms={platforms}
+              platformChannels={platformChannels}
+              ideas={ideas}
+              members={members}
+              actor={actor}
+              onNewChannel={() => setShowNewChannel(true)}
+              onEditChannel={setEditChannelTarget}
+              onDeleteChannel={setConfirmDeleteChannel}
               runAction={runAction}
               showToast={showToast}
             />
@@ -1849,28 +1894,134 @@ export default function ClientApp({
 
       {/* ADD CHANNEL MODAL */}
       {showNewChannel && (
-        <Modal title="Thêm Kênh mới (Channel Group)" onClose={() => setShowNewChannel(false)}>
+        <Modal title="Thêm Kênh mới (Channel Group)" onClose={() => { setShowNewChannel(false); setNewChannelTopic(""); setNewChannelPlatforms(["plat_yt", "plat_tt"]); }}>
           <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
             e.preventDefault();
             const form = e.currentTarget;
             const name = (form.elements.namedItem("channelName") as HTMLInputElement).value;
             const color = (form.elements.namedItem("channelColor") as HTMLInputElement).value;
+            const topicBranch = (form.elements.namedItem("channelTopicBranch") as HTMLInputElement)?.value || newChannelTopic || "";
             const description = (form.elements.namedItem("channelDescription") as HTMLTextAreaElement)?.value || "";
             const referenceVideoLink = (form.elements.namedItem("referenceVideoLink") as HTMLInputElement)?.value || "";
             const videoFormat = (form.elements.namedItem("videoFormat") as HTMLInputElement)?.value || "";
             const discordWebhookUrl = (form.elements.namedItem("channelDiscordWebhook") as HTMLInputElement)?.value || "";
-            const selectedPlatformIds = Array.from(
-              (form.elements.namedItem("platformIds") as HTMLSelectElement).selectedOptions
-            ).map(o => o.value);
             
-            runAction(createChannelGroupAction, name, color, selectedPlatformIds, description, referenceVideoLink, videoFormat, discordWebhookUrl);
+            // Đảm bảo YouTube và TikTok luôn là nền tảng mặc định
+            const platformsToSave = newChannelPlatforms.length > 0 ? newChannelPlatforms : ["plat_yt", "plat_tt"];
+            
+            runAction(createChannelGroupAction, name, color, platformsToSave, description, referenceVideoLink, videoFormat, discordWebhookUrl, topicBranch);
             setShowNewChannel(false);
+            setNewChannelTopic("");
+            setNewChannelPlatforms(["plat_yt", "plat_tt"]);
             showToast(`Đã tạo kênh "${name}"`);
           }}>
-            <div className="space-y-3">
+            <div className="space-y-3.5">
               <div>
                 <FieldLabel required>Tên Kênh</FieldLabel>
                 <TextInput id="channelName" autoFocus required placeholder="VD: YNDA Phim Ngắn, YNDA Tâm Lý..." />
+              </div>
+
+              {/* NHÁNH CHỦ ĐỀ (TOPIC BRANCH) */}
+              <div>
+                <FieldLabel required>Nhánh chủ đề (Topic Branch)</FieldLabel>
+                <TextInput 
+                  id="channelTopicBranch" 
+                  value={newChannelTopic} 
+                  onChange={(e: any) => setNewChannelTopic(e.target.value)}
+                  placeholder="VD: Điện ảnh & Phân tích phim, Tâm lý học, Phim ngắn..." 
+                  required
+                />
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  <span className="text-[10px] text-slate-400 py-0.5">Gợi ý nhanh:</span>
+                  {SUGGESTED_TOPIC_BRANCHES.map(t => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setNewChannelTopic(t)}
+                      className={`text-[10px] px-2 py-0.5 rounded-full border transition-all ${
+                        newChannelTopic === t 
+                          ? "bg-indigo-100 text-indigo-800 border-indigo-300 font-semibold" 
+                          : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                      }`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* NỀN TẢNG PHÁT HÀNH: MẶC ĐỊNH YOUTUBE VÀ TIKTOK LÀ PHỤ */}
+              <div>
+                <FieldLabel>Nền tảng phát hành (Mặc định: YouTube & TikTok phụ)</FieldLabel>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+                  {/* YouTube - Chính */}
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-lg border border-red-200 bg-red-50/50 cursor-pointer select-none hover:bg-red-50 transition-colors">
+                    <input 
+                      type="checkbox" 
+                      checked={newChannelPlatforms.includes("plat_yt")}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setNewChannelPlatforms(prev => Array.from(new Set([...prev, "plat_yt"])));
+                        } else {
+                          setNewChannelPlatforms(prev => prev.filter(id => id !== "plat_yt"));
+                        }
+                      }}
+                      className="mt-0.5 rounded border-slate-300 text-red-600 focus:ring-red-500" 
+                    />
+                    <div>
+                      <div className="text-xs font-bold text-red-900 flex items-center gap-1.5">
+                        YouTube <span className="text-[10px] font-semibold px-1.5 py-0.2 bg-red-100 text-red-700 rounded">Chính (Master 16:9)</span>
+                      </div>
+                      <div className="text-[11px] text-red-700/80">Kênh phát hành bản dựng master đầy đủ</div>
+                    </div>
+                  </label>
+
+                  {/* TikTok - Phụ */}
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-lg border border-slate-300 bg-slate-100/70 cursor-pointer select-none hover:bg-slate-100 transition-colors">
+                    <input 
+                      type="checkbox" 
+                      checked={newChannelPlatforms.includes("plat_tt")}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setNewChannelPlatforms(prev => Array.from(new Set([...prev, "plat_tt"])));
+                        } else {
+                          setNewChannelPlatforms(prev => prev.filter(id => id !== "plat_tt"));
+                        }
+                      }}
+                      className="mt-0.5 rounded border-slate-300 text-slate-900 focus:ring-slate-900" 
+                    />
+                    <div>
+                      <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                        TikTok <span className="text-[10px] font-semibold px-1.5 py-0.2 bg-slate-200 text-slate-800 rounded">Phụ (Cutdown 9:16)</span>
+                      </div>
+                      <div className="text-[11px] text-slate-600">Reframe dọc kéo tương tác về kênh chính</div>
+                    </div>
+                  </label>
+
+                  {/* Other platforms */}
+                  {platforms.filter(p => p.id !== "plat_yt" && p.id !== "plat_tt").map(p => (
+                    <label key={p.id} className="flex items-start gap-2.5 p-2.5 rounded-lg border border-slate-200 bg-white cursor-pointer select-none hover:bg-slate-50 transition-colors">
+                      <input 
+                        type="checkbox" 
+                        checked={newChannelPlatforms.includes(p.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setNewChannelPlatforms(prev => Array.from(new Set([...prev, p.id])));
+                          } else {
+                            setNewChannelPlatforms(prev => prev.filter(id => id !== p.id));
+                          }
+                        }}
+                        className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" 
+                      />
+                      <div>
+                        <div className="text-xs font-semibold text-slate-800">{p.name}</div>
+                        <div className="text-[11px] text-slate-500">Mặc định {p.defaultDurationDays} ngày sản xuất</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1.5">
+                  💡 Mặc định mỗi kênh có YouTube (Chính) và TikTok (Phụ) để đồng bộ quy trình cắt dựng phái sinh.
+                </p>
               </div>
 
               <div>
@@ -1883,7 +2034,7 @@ export default function ClientApp({
 
               <div>
                 <FieldLabel>Mô tả định hướng nội dung của Kênh</FieldLabel>
-                <TextArea id="channelDescription" rows={3} placeholder="Mô tả phong cách, đối tượng khán giả, chủ đề chính... Dán link tham khảo hoặc tài liệu ở bất kỳ đâu trong mô tả" />
+                <TextArea id="channelDescription" rows={2} placeholder="Mô tả phong cách, đối tượng khán giả, chủ đề chính... Dán link tham khảo hoặc tài liệu ở bất kỳ đâu trong mô tả" />
                 <p className="text-[11px] text-slate-500 mt-1">💡 Có thể dán link trực tiếp ở bất kỳ đâu trong mô tả, hệ thống sẽ tự nhận diện và hiển thị link có thể click được.</p>
               </div>
 
@@ -1905,21 +2056,11 @@ export default function ClientApp({
                 <TextInput id="channelDiscordWebhook" placeholder="VD: Link chủ đề Discord https://discord.com/channels/... hoặc ID Thread" />
                 <p className="text-[11px] text-slate-500 mt-1">Chuột phải vào Chủ đề trên Discord &rarr; <b>Sao chép liên kết</b> rồi dán vào đây để bot tự gửi tin vào đúng chủ đề kênh này.</p>
               </div>
-
-              <div>
-                <FieldLabel>Nền tảng phát hành (giữ Ctrl để chọn nhiều)</FieldLabel>
-                <select name="platformIds" multiple className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs bg-white text-slate-700 focus:outline-none focus:border-slate-900 min-h-[80px]">
-                  {platforms.map((p: Platform) => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.defaultDurationDays} ngày)</option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-slate-500 mt-1">Nếu không chọn, hệ thống sẽ tự gán các nền tảng mặc định.</p>
-              </div>
             </div>
 
             <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-slate-100">
-              <Btn onClick={() => setShowNewChannel(false)}>Huỷ</Btn>
-              <Btn tone="primary" type="submit" loading={isPending}>Tạo Kênh</Btn>
+              <Btn onClick={() => { setShowNewChannel(false); setNewChannelTopic(""); setNewChannelPlatforms(["plat_yt", "plat_tt"]); }}>Huỷ</Btn>
+              <Btn tone="primary" type="submit" loading={isPending}>Tạo Kênh Mới</Btn>
             </div>
           </form>
         </Modal>
@@ -1933,19 +2074,45 @@ export default function ClientApp({
             const form = e.currentTarget;
             const name = (form.elements.namedItem("editChannelName") as HTMLInputElement).value;
             const color = (form.elements.namedItem("editChannelColor") as HTMLInputElement).value;
+            const topicBranch = (form.elements.namedItem("editChannelTopicBranch") as HTMLInputElement)?.value || "";
             const description = (form.elements.namedItem("editChannelDescription") as HTMLTextAreaElement)?.value || "";
             const referenceVideoLink = (form.elements.namedItem("editReferenceVideoLink") as HTMLInputElement)?.value || "";
             const videoFormat = (form.elements.namedItem("editVideoFormat") as HTMLInputElement)?.value || "";
             const discordWebhookUrl = (form.elements.namedItem("editChannelDiscordWebhook") as HTMLInputElement)?.value || "";
             
-            runAction(updateChannelGroupAction, editChannelTarget.id, name, color, description, referenceVideoLink, videoFormat, discordWebhookUrl);
+            runAction(updateChannelGroupAction, editChannelTarget.id, name, color, description, referenceVideoLink, videoFormat, discordWebhookUrl, topicBranch);
             setEditChannelTarget(null);
             showToast(`Đã cập nhật kênh "${name}"`);
           }}>
-            <div className="space-y-3">
+            <div className="space-y-3.5">
               <div>
                 <FieldLabel required>Tên Kênh</FieldLabel>
                 <TextInput id="editChannelName" autoFocus required defaultValue={editChannelTarget.name} />
+              </div>
+
+              <div>
+                <FieldLabel required>Nhánh chủ đề (Topic Branch)</FieldLabel>
+                <TextInput 
+                  id="editChannelTopicBranch" 
+                  defaultValue={editChannelTarget.topicBranch || ""} 
+                  placeholder="VD: Điện ảnh & Phân tích phim, Tâm lý học..." 
+                  required
+                />
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  <span className="text-[10px] text-slate-400 py-0.5">Gợi ý nhanh:</span>
+                  {SUGGESTED_TOPIC_BRANCHES.map(t => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => {
+                        const input = document.getElementById("editChannelTopicBranch") as HTMLInputElement;
+                        if (input) input.value = t;
+                      }}
+                      className="text-[10px] px-2 py-0.5 rounded-full border bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 transition-colors">
+                      {t}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>
@@ -3983,8 +4150,13 @@ function ChannelGanttView({
       <div className="rounded-xl border border-[#E2E8F0] bg-white saas-shadow overflow-hidden">
         <div className="p-4 border-b border-[#E2E8F0] bg-slate-50 flex items-start justify-between">
           <div>
-            <h3 className="font-bold text-xs text-slate-900 uppercase">
-              Tiến độ sản xuất Kênh: {currentChannel?.name}
+            <h3 className="font-bold text-xs text-slate-900 uppercase flex items-center gap-2 flex-wrap">
+              <span>Tiến độ sản xuất Kênh: {currentChannel?.name}</span>
+              {currentChannel?.topicBranch && (
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 normal-case">
+                  Nhánh: {currentChannel.topicBranch}
+                </span>
+              )}
             </h3>
             {currentChannel?.description && (
               <div className="text-[11px] text-slate-600 mt-1 max-w-3xl">

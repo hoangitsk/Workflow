@@ -49,7 +49,7 @@ export default async function Page() {
     auditLogs: [],
     notifications: [],
     checklists: [],
-    settings: { discordWebhookUrl: '', discordIdeaWebhookUrl: '', externalCalendarUrl: '' },
+    settings: { discordWebhookUrl: '', discordIdeaWebhookUrl: '', externalCalendarUrl: '', discordMuted: false },
     pitchingBatches: []
   };
 
@@ -66,7 +66,7 @@ export default async function Page() {
         auditLogs: Array.isArray(data.auditLogs) ? data.auditLogs : [],
         notifications: Array.isArray(data.notifications) ? data.notifications : [],
         checklists: Array.isArray(data.checklists) ? data.checklists : [],
-        settings: data.settings || { discordWebhookUrl: '', discordIdeaWebhookUrl: '', externalCalendarUrl: '' },
+        settings: data.settings || { discordWebhookUrl: '', discordIdeaWebhookUrl: '', externalCalendarUrl: '', discordMuted: false },
         pitchingBatches: Array.isArray(data.pitchingBatches) ? data.pitchingBatches : []
       };
     }

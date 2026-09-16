@@ -63,7 +63,8 @@ export async function createChannelGroupAction(
   description?: string, 
   referenceVideoLink?: string, 
   videoFormat?: string,
-  discordWebhookUrl?: string
+  discordWebhookUrl?: string,
+  topicBranch?: string
 ) {
   const member = await getCurrentMember();
   if (!member) throw new Error("Chưa đăng nhập");
@@ -74,9 +75,21 @@ export async function createChannelGroupAction(
   const sql = getDb();
   const channelGroupId = `cg_${Date.now().toString(36)}`;
 
+  // Đảm bảo platforms mặc định plat_yt (YouTube) và plat_tt (TikTok) luôn tồn tại
+  await sql.query(`
+    INSERT INTO platforms (id, name, default_duration_days) 
+    VALUES ('plat_yt', 'YouTube', 4) 
+    ON CONFLICT (id) DO NOTHING
+  `);
+  await sql.query(`
+    INSERT INTO platforms (id, name, default_duration_days) 
+    VALUES ('plat_tt', 'TikTok', 2) 
+    ON CONFLICT (id) DO NOTHING
+  `);
+
   await sql.query(
-    `INSERT INTO channel_groups (id, name, color, archived, description, reference_video_link, video_format, discord_webhook_url)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    `INSERT INTO channel_groups (id, name, color, archived, description, reference_video_link, video_format, discord_webhook_url, topic_branch)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
     [
       channelGroupId, 
       name.trim(), 
@@ -85,14 +98,18 @@ export async function createChannelGroupAction(
       description?.trim() || null, 
       referenceVideoLink?.trim() || null, 
       videoFormat?.trim() || null,
-      discordWebhookUrl?.trim() || null
+      discordWebhookUrl?.trim() || null,
+      topicBranch?.trim() || null
     ]
   );
 
-  // Automatically create PlatformChannels for selected platforms
-  const platformsToAssign = (selectedPlatformIds && selectedPlatformIds.length > 0) 
-    ? selectedPlatformIds 
+  // Tự động gán YouTube và TikTok là mặc định (mỗi kênh có YouTube chính & TikTok phụ)
+  let platformsToAssign = (selectedPlatformIds && selectedPlatformIds.length > 0) 
+    ? [...selectedPlatformIds] 
     : ["plat_yt", "plat_tt"];
+
+  if (!platformsToAssign.includes("plat_yt")) platformsToAssign.unshift("plat_yt");
+  if (!platformsToAssign.includes("plat_tt")) platformsToAssign.push("plat_tt");
 
   for (const platId of platformsToAssign) {
     await sql.query(
@@ -103,7 +120,7 @@ export async function createChannelGroupAction(
     );
   }
 
-  await recordAuditLog('', member.id, "Tạo Kênh mới", { name, color, platforms: platformsToAssign });
+  await recordAuditLog('', member.id, "Tạo Kênh mới", { name, color, topicBranch, platforms: platformsToAssign });
   revalidatePath("/");
 }
 
@@ -114,7 +131,8 @@ export async function updateChannelGroupAction(
   description?: string, 
   referenceVideoLink?: string, 
   videoFormat?: string,
-  discordWebhookUrl?: string
+  discordWebhookUrl?: string,
+  topicBranch?: string
 ) {
   const member = await getCurrentMember();
   if (!member) throw new Error("Chưa đăng nhập");
@@ -125,8 +143,8 @@ export async function updateChannelGroupAction(
   const sql = getDb();
   await sql.query(
     `UPDATE channel_groups 
-     SET name = $1, color = $2, description = $3, reference_video_link = $4, video_format = $5, discord_webhook_url = $6 
-     WHERE id = $7`,
+     SET name = $1, color = $2, description = $3, reference_video_link = $4, video_format = $5, discord_webhook_url = $6, topic_branch = $7 
+     WHERE id = $8`,
     [
       name.trim(), 
       color || "#5B9EE8", 
@@ -134,11 +152,12 @@ export async function updateChannelGroupAction(
       referenceVideoLink?.trim() || null, 
       videoFormat?.trim() || null, 
       discordWebhookUrl?.trim() || null,
+      topicBranch?.trim() || null,
       channelGroupId
     ]
   );
 
-  await recordAuditLog('', member.id, "Cập nhật thông tin kênh", { channelGroupId, name });
+  await recordAuditLog('', member.id, "Cập nhật thông tin kênh", { channelGroupId, name, topicBranch });
   revalidatePath("/");
 }
 
@@ -405,7 +424,12 @@ export async function removeMemberAction(memberEmailToRemove: string) {
 // -------------------------------------------------------------
 // SETTINGS
 // -------------------------------------------------------------
-export async function updateSettingsAction(discordWebhookUrl: string, externalCalendarUrl: string, discordIdeaWebhookUrl?: string) {
+export async function updateSettingsAction(
+  discordWebhookUrl: string, 
+  externalCalendarUrl: string, 
+  discordIdeaWebhookUrl?: string,
+  discordMuted?: boolean
+) {
   const current = await getCurrentMember();
   if (!current) throw new Error("Chưa đăng nhập");
   if (current.role !== "Core") throw new Error("Chỉ Core mới có quyền chỉnh sửa cấu hình hệ thống");
@@ -433,6 +457,14 @@ export async function updateSettingsAction(discordWebhookUrl: string, externalCa
       `INSERT INTO settings (key, value) VALUES ('externalCalendarUrl', $1)
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
       [externalCalendarUrl.trim()]
+    );
+  }
+
+  if (discordMuted !== undefined) {
+    await sql.query(
+      `INSERT INTO settings (key, value) VALUES ('discordMuted', $1)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [discordMuted ? 'true' : 'false']
     );
   }
 
