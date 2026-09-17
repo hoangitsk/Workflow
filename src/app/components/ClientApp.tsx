@@ -1543,9 +1543,15 @@ export default function ClientApp({
             const assigneeEmail = (form.elements.namedItem("assignee") as HTMLSelectElement).value;
             const days = parseInt((form.elements.namedItem("durationDays") as HTMLInputElement).value, 10);
             
-            runAction(approveIdeaAction, approveIdeaTarget.id, assigneeEmail, days);
-            setApproveIdeaTarget(null);
-            showToast("Đã duyệt ý tưởng và giao việc");
+            runAction(async () => {
+              const res = await approveIdeaAction(approveIdeaTarget.id, assigneeEmail, days);
+              if (res && !res.success && res.error) {
+                alert(res.error);
+                return;
+              }
+              setApproveIdeaTarget(null);
+              showToast("Đã duyệt ý tưởng và giao việc");
+            });
           }}>
             <div className="space-y-3">
               <div>

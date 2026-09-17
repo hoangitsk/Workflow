@@ -227,90 +227,123 @@ export async function approveGate1IdeaAction(
   }
 }
 
-export async function approveIdeaAction(ideaId: string, durationDays: number, producerEmail: string, platformChannelId?: string) {
-  const member = await getCurrentMember();
-  if (!member) throw new Error("Chưa đăng nhập");
-  if (member.role !== "Core" && member.role !== "E") throw new Error("Chỉ Core hoặc Editor mới có quyền duyệt ý tưởng vào sản xuất");
+export async function approveIdeaAction(
+  ideaId: string, 
+  arg2: any, 
+  arg3: any, 
+  platformChannelId?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const member = await getCurrentMember();
+    if (!member) {
+      return { success: false, error: "Chưa đăng nhập hoặc phiên làm việc đã hết hạn. Vui lòng tải lại trang và đăng nhập lại." };
+    }
+    if (member.role !== "Core" && member.role !== "E") {
+      return { success: false, error: "Chỉ Core hoặc Editor mới có quyền duyệt ý tưởng vào sản xuất." };
+    }
 
-  if (!producerEmail || !producerEmail.trim()) {
-    throw new Error("Bắt buộc phải chọn 1 Producer cụ thể phụ trách");
-  }
+    // Tự động nhận diện thông minh dù truyền (email, days) hay (days, email)
+    let producerEmail = "";
+    let durationDays = 2;
 
-  if (!durationDays || durationDays < 1) {
-    throw new Error("Số ngày sản xuất phải từ 1 ngày trở lên");
-  }
+    if (typeof arg2 === "number" || (typeof arg2 === "string" && /^\d+$/.test(arg2.trim()) && !arg2.includes("@"))) {
+      durationDays = typeof arg2 === "number" ? arg2 : parseInt(arg2, 10);
+      producerEmail = String(arg3 ?? "").trim();
+    } else {
+      producerEmail = String(arg2 ?? "").trim();
+      durationDays = typeof arg3 === "number" ? arg3 : parseInt(String(arg3 || "2"), 10);
+    }
 
-  const row = await getIdeaRow(ideaId);
-  if (!row) throw new Error("Không tìm thấy ý tưởng");
+    if (isNaN(durationDays) || durationDays < 1) {
+      durationDays = 2;
+    }
 
-  if (row.status !== "PITCH" && row.status !== "ARCHIVED_IDEA") {
-    throw new Error("Chỉ có thể duyệt ý tưởng đang ở trạng thái PITCH hoặc Đã lưu trữ");
-  }
+    if (!producerEmail) {
+      return { success: false, error: "Bắt buộc phải chọn 1 Producer cụ thể phụ trách." };
+    }
 
-  const today = new Date();
-  const endDate = new Date();
-  endDate.setDate(today.getDate() + durationDays - 1);
+    const row = await getIdeaRow(ideaId);
+    if (!row) {
+      return { success: false, error: "Không tìm thấy ý tưởng trong hệ thống." };
+    }
 
-  const todayIso = today.toISOString().slice(0, 10);
-  const endIso = endDate.toISOString().slice(0, 10);
+    if (row.status !== "PITCH" && row.status !== "ARCHIVED_IDEA") {
+      return { success: false, error: `Chỉ có thể duyệt ý tưởng đang ở trạng thái PITCH hoặc Đã lưu trữ (hiện tại: ${row.status}).` };
+    }
 
-  const sql = getDb();
-  await sql.query(
-    `UPDATE ideas SET 
-       status = 'ASSIGNMENT',
-       active_gate = 'GATE_2_SCRIPT',
-       platform_channel_id = COALESCE($1, platform_channel_id),
-       duration_days = $2,
-       assigned_to_email = $3,
-       start_date = $4,
-       end_date = $5,
-       deadline_script = $5,
-       assigned_at = $6,
-       gate1_approved_at = $6,
-       gate1_approved_by_email = $7,
-       credits_approved_by_email = $7,
-       script_status = 'DRAFT',
-       script_locked = FALSE,
-       production_checklist = COALESCE(production_checklist, $8),
-       qc_checklist = COALESCE(qc_checklist, $9)
-     WHERE id = $10`,
-    [
-      platformChannelId ? platformChannelId.trim() : null,
+    const today = new Date();
+    const endDate = new Date();
+    endDate.setDate(today.getDate() + durationDays - 1);
+
+    const todayIso = today.toISOString().slice(0, 10);
+    const endIso = endDate.toISOString().slice(0, 10);
+
+    const sql = getDb();
+    await sql.query(
+      `UPDATE ideas SET 
+         status = 'ASSIGNMENT',
+         active_gate = 'GATE_2_SCRIPT',
+         platform_channel_id = COALESCE($1, platform_channel_id),
+         duration_days = $2,
+         assigned_to_email = $3,
+         start_date = $4,
+         end_date = $5,
+         deadline_script = $5,
+         assigned_at = $6,
+         gate1_approved_at = $6,
+         gate1_approved_by_email = $7,
+         credits_approved_by_email = $7,
+         script_status = 'DRAFT',
+         script_locked = FALSE,
+         production_checklist = COALESCE(production_checklist, $8),
+         qc_checklist = COALESCE(qc_checklist, $9)
+       WHERE id = $10`,
+      [
+        platformChannelId ? platformChannelId.trim() : null,
+        durationDays,
+        producerEmail,
+        todayIso,
+        endIso,
+        today.toISOString(),
+        member.id,
+        JSON.stringify(DEFAULT_PRODUCTION_CHECKLIST),
+        JSON.stringify(DEFAULT_QC_CHECKLIST),
+        ideaId
+      ]
+    );
+
+    await recordAuditLog(ideaId, member.id, "Duyệt ý tưởng PITCH -> ASSIGNMENT", {
       durationDays,
-      producerEmail.trim(),
-      todayIso,
-      endIso,
-      today.toISOString(),
-      member.id,
-      JSON.stringify(DEFAULT_PRODUCTION_CHECKLIST),
-      JSON.stringify(DEFAULT_QC_CHECKLIST),
-      ideaId
-    ]
-  );
+      assignedToEmail: producerEmail,
+      startDate: todayIso,
+      endDate: endIso
+    });
 
-  await recordAuditLog(ideaId, member.id, "Duyệt ý tưởng PITCH -> ASSIGNMENT", {
-    durationDays,
-    assignedToEmail: producerEmail,
-    startDate: todayIso,
-    endDate: endIso
-  });
+    await createNotification(
+      producerEmail,
+      'assigned',
+      ideaId,
+      `Bạn đã được giao sản xuất ý tưởng "${row.title}" (Hạn: ${endIso})`
+    );
 
-  await createNotification(
-    producerEmail,
-    'assigned',
-    ideaId,
-    `Bạn đã được giao sản xuất ý tưởng "${row.title}" (Hạn: ${endIso})`
-  );
+    try {
+      const channelWebhook = await getWebhookUrlForPlatformChannel(platformChannelId || row.platform_channel_id);
+      await sendDiscordWebhook(
+        `📋 Ý tưởng **"${row.title}"** đã được duyệt và giao cho **${producerEmail}** (Sản xuất: ${durationDays} ngày, hạn: ${endIso})`,
+        undefined,
+        channelWebhook,
+        'general'
+      );
+    } catch (dErr) {
+      console.error("Lỗi gửi Discord webhook khi duyệt ý tưởng:", dErr);
+    }
 
-  const channelWebhook = await getWebhookUrlForPlatformChannel(platformChannelId || row.platform_channel_id);
-  await sendDiscordWebhook(
-    `📋 Ý tưởng **"${row.title}"** đã được duyệt và giao cho **${producerEmail}** (Sản xuất: ${durationDays} ngày, hạn: ${endIso})`,
-    undefined,
-    channelWebhook,
-    'general'
-  );
-
-  revalidatePath("/");
+    revalidatePath("/");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Lỗi approveIdeaAction:", err);
+    return { success: false, error: err.message || "Có lỗi xảy ra khi duyệt ý tưởng" };
+  }
 }
 
 // ==========================================
