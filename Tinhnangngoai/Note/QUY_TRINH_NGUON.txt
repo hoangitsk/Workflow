@@ -1,0 +1,452 @@
+"QUY TRÌNH VẬN HÀNH TỔNG DỰ ÁN
+________________________________________
+I. CẤU TRÚC CHUẨN CỦA MỖI QUY TRÌNH
+Tất cả SOP/Hướng dẫn trong dự án phải thống nhất theo 6 phần.
+I. Xác định mục tiêu
+•	Quy trình này sinh ra để giải quyết vấn đề gì?
+•	Ai sử dụng?
+•	Khi nào sử dụng?
+•	Đầu ra cuối cùng cần đạt là gì?
+II. Mô tả chi tiết
+•	Bối cảnh.
+•	Khái niệm cần biết.
+•	Người chịu trách nhiệm.
+•	Input.
+•	Output.
+•	Công cụ sử dụng.
+•	Deadline/SLA nếu có.
+III. Phân loại và mô tả các bước
+Mỗi bước phải có:
+Input → Người làm → Hành động → Output → Người nhận → Deadline
+“Producer nhận Script đã duyệt → chuẩn bị Voice/Visual/BGM → dựng Video Draft → tự QC → nộp Editor.”
+IV. Minh họa
+Mỗi quy trình nên có tối thiểu:
+•	Ảnh chụp màn hình.
+•	Khoanh vùng nút cần bấm.
+•	Một ví dụ đúng.
+•	Nếu cần: một ví dụ sai.
+•	Link mẫu/template.
+Ưu tiên sử dụng:
+Screenshot + số thứ tự + mũi tên + chú thích ngắn.
+Ví dụ:
+[Hình 01] – Chọn nút “Nộp Idea”
+1 → Nút cần chọn
+2 → Vùng nhập tiêu đề
+3 → Vùng nhập nội dung
+4 → Nút Submit
+V. Đánh giá và phản hồi
+VI. Luyện tập và đào tạo thành viên
+________________________________________
+II. SƠ ĐỒ VẬN HÀNH TỔNG
+Luồng chính
+CORE
+↓ Định hướng
+CHECKLIST KÊNH
+↓
+CONTENT FUNNEL / TUYẾN NỘI DUNG
+↓
+PITCHING IDEA
+↓
+DUYỆT IDEA
+↓
+SCRIPT
+↓
+DUYỆT SCRIPT
+↓
+VOICE + VISUAL + ASSETS
+↓
+PRODUCTION
+↓
+EDITOR QC & HOÀN THIỆN
+↓
+CORE DUYỆT
+↓
+PUBLISH
+↓
+ANALYTICS
+↓
+FEEDBACK
+↓
+Quay trở lại:
+ĐỊNH HƯỚNG → IDEA → CONTENT
+________________________________________
+III. PHÂN QUYỀN VÀ TRÁCH NHIỆM
+1. CORE
+Core chịu trách nhiệm:
+•	Xác định mục tiêu chung của dự án.
+•	Xác định mục tiêu từng kênh.
+•	Định hướng Content Funnel.
+•	Đưa KPI.
+•	Đưa ra các tuyến nội dung cần triển khai.
+•	Duyệt các sản phẩm cuối ở cấp dự án.
+•	Theo dõi kết quả tổng.
+•	Điều chỉnh chiến lược.
+KPI tuần:
+•	01 video YouTube.
+•	02 video TikTok.
+IV. QUY TRÌNH 01 – CHECKLIST CONTENT TỔNG KÊNH
+I. Mục tiêu
+Checklist Content Tổng Kênh nhằm xác định:
+•	Kênh đang phục vụ mục tiêu nào.
+•	Đối tượng người xem.
+•	Nội dung đang nằm ở giai đoạn nào của Funnel.
+•	Tuyến Content nào cần sản xuất.
+•	KPI từng tuyến.
+•	Tần suất đăng.
+________________________________________
+II. Phân loại Funnel
+1. TOF – TOP OF FUNNEL ( Kênh TikTok)
+Mục tiêu: Thu hút người xem mới.
+Các tuyến có thể bao gồm:
+•	Branding.
+•	News/Trend.
+•	PR.
+•	Nội dung giải trí.
+•	Nội dung dễ tiếp cận.
+•	Nội dung tạo tò mò.
+Đặc điểm:
+•	Chủ đề rộng.
+•	Hook mạnh.
+•	Người chưa biết dự án vẫn hiểu.
+•	Tập trung Reach/View/Discovery.
+________________________________________
+2. MOF – MIDDLE OF FUNNEL ( Youtube )
+Mục tiêu:
+Chuyển người đã xem thành người bắt đầu:
+•	Quan tâm.
+•	Follow.
+•	Xem nhiều nội dung.
+•	Nhận diện phong cách/giá trị của kênh.
+Tuyến Content có thể gồm:
+•	Series.
+•	Phân tích chuyên sâu.
+•	Nội dung có format nhận diện.
+•	Nội dung giáo dục.
+•	Case study.
+•	Storytelling.
+•	Behind the scenes.
+________________________________________
+3. BOF – BOTTOM OF FUNNEL
+Mục tiêu:
+Chuyển khán giả trung thành thành:
+•	Thành viên cộng đồng.
+•	Người tham gia hoạt động.
+•	Người tham gia workshop/sự kiện.
+•	Người dự thi.
+•	Ambassador/cộng tác viên.
+Content có thể gồm:
+•	Thông báo sự kiện.
+•	Challenge.
+•	Cuộc thi.
+•	Workshop.
+•	Community Activity.
+•	CTA tham gia cộng đồng.
+________________________________________
+III. Các bước thực hiện Checklist Content Tổng Kênh
+BƯỚC 1 – MỞ CHECKLIST MASTER
+Truy cập:
+Mẫu Checklist Content Tổng Kênh
+[Link Google Sheet hiện tại]
+BƯỚC 2 – TẠO BẢN SAO
+Không chỉnh trực tiếp file Master.
+Tên file:
+[Tên Kênh] – Content Checklist – [Tháng/Năm]
+Ví dụ:
+Ý Niệm Điện Ảnh – Content Checklist – 10/2026
+BƯỚC 3 – ĐIỀN THÔNG TIN KÊNH
+Điền:
+•	Tên kênh.
+•	Mục tiêu.
+•	Target Audience.
+•	Giai đoạn Funnel.
+•	Tuyến Content.
+•	Platform.
+•	KPI.
+•	Số lượng bài/video.
+•	Deadline.
+•	Người phụ trách.
+BƯỚC 4 – CORE DUYỆT
+Core đánh giá:
+•	Tuyến Content có đúng mục tiêu không?
+•	Tỷ lệ TOF/MOF/BOF có hợp lý không?
+•	Có đáp ứng KPI không?
+BƯỚC 5 – CHUYỂN CHO BAN ĐÀO TẠO
+Checklist được duyệt trở thành:
+Input để Ban Đào tạo tạo các đợt Pitching Idea.
+________________________________________
+V. QUY TRÌNH 02 – CHECKLIST CÔNG VIỆC KÊNH
+I. Mục tiêu
+Biến kế hoạch Content thành các đầu việc cụ thể.
+Mỗi sản phẩm phải biết rõ:
+•	Ai phụ trách.
+•	Đang ở bước nào.
+•	Deadline nào.
+•	Đầu ra là gì.
+II. Các trường thông tin bắt buộc
+Checklist đề xuất:
+ID	Công việc	Kênh	Tuyến	Người phụ trách	Ngày bắt đầu	Deadline	Status	Output	Link	Note
+Status thống nhất:
+•	Not Started
+•	Doing
+•	Waiting Review
+•	Revision
+•	Approved
+•	Published
+•	Done
+
+III. Quy trình
+Bước 1
+Nhận Content Checklist đã được duyệt.
+Bước 2
+Tách từng Content thành Task.
+Bước 3
+Giao Owner.
+Bước 4
+Điền Deadline.
+Bước 5
+Gắn link tài nguyên.
+Bước 6
+Cập nhật Status xuyên suốt quá trình.
+Bước 7
+Leader kiểm tra định kỳ.
+V- Checklist Công việc tổng toàn dự án
+
+
+
+IV. Kiểm tra trước khi vận hành
+Không bắt đầu sản xuất nếu thiếu:
+•	Định vị.
+•	Content Pillar.
+•	Người phụ trách.
+•	Script Template.
+•	Production Format.
+•	Folder lưu trữ.
+•	Quyền truy cập.
+________________________________________
+VII. QUY TRÌNH 04 – XÂY DỰNG NỘI DUNG / PITCHING IDEA
+A. BAN ĐÀO TẠO
+I. Mục tiêu
+Ban Đào tạo biến:
+Định hướng của Core
+thành:
+Các đợt Pitching đủ rõ để thành viên có thể tạo Idea.
+________________________________________
+II. TẠO ĐỢT PITCHING
+BƯỚC 1
+Chọn:
+Tạo đợt Pitching
+BƯỚC 2
+Điền:
+1.	Tuyến bài.
+2.	Tiêu đề đợt Pitching.
+3.	Deadline.
+4.	Yêu cầu.
+5.	Định hướng.
+6.	Gợi ý.
+7.	Kênh áp dụng.
+8.	Tài liệu Reference.
+Sau đó chọn:
+PHÁT ĐỘNG
+________________________________________
+III. DUYỆT IDEA
+Ban Đào tạo đánh giá
+IV. KẾT QUẢ DUYỆT
+Nếu không đạt
+Feedback rõ:
+•	Vấn đề nằm ở đâu?
+•	Cần sửa gì?
+•	Có được nộp lại không?
+Nếu đạt
+Ban Đào tạo:
+1.	Chọn Duyệt.
+2.	Chọn Producer phụ trách.
+3.	Đặt Deadline Script.
+4.	Đặt Deadline Production.
+________________________________________
+B. BAN DỰ ÁN / PRODUCER
+BƯỚC 1 – NỘP IDEA
+Khi thấy đợt Pitching:
+Chọn:
+Nộp Idea
+Điền Idea theo Prompt.
+Form Idea đề xuất
+Tên Idea:
+Kênh:
+Tuyến Content:
+Insight:
+Hook dự kiến:
+Vấn đề muốn khai thác:
+Góc nhìn:
+3 luận điểm chính:
+Giá trị người xem nhận được:
+Footage/Reference:
+CTA:
+
+BƯỚC 2 – IDEA ĐƯỢC DUYỆT
+Producer chuyển Idea thành Script.
+Cấu trúc:
+HOOK
+↓
+BODY
+↓
+OUTRO
+↓
+CTA / LOOP
+Script phải thể hiện:
+•	Voice.
+•	Nội dung.
+•	Footage.
+•	Visual.
+•	Linh vật.
+•	Graphic.
+•	Subtitle.
+•	BGM.
+•	SFX.
+•	Edit Note.
+•	Reference.
+________________________________________
+BƯỚC 3 – NỘP SCRIPT
+Producer nộp Script trước Deadline.
+Status:
+WAITING REVIEW
+________________________________________
+BƯỚC 4 – EDITOR DUYỆT SCRIPT
+Kiểm tra:
+•	Đúng Idea.
+•	Logic.
+•	Chính xác.
+•	Đúng Format.
+•	Có giá trị.
+•	Có khả năng sản xuất.
+Script chưa Approved → không Production.
+________________________________________
+VIII. QUY TRÌNH 05 – TẠO ÂM THANH
+I. Mục tiêu
+Tạo Voice đúng:
+•	Nội dung.
+•	Tone.
+•	Tốc độ.
+•	Cảm xúc.
+•	Nhận diện kênh.
+________________________________________
+II. Input
+•	Final Script.
+•	Voice Guideline.
+•	Pronunciation Note.
+•	Reference Voice.
+________________________________________
+III. Các bước
+Bước 1
+Mở công cụ tạo Voice.
+[CẦN LINK WEBSITE]
+Bước 2
+Chia Script thành từng đoạn.
+Bước 3
+Chọn Voice phù hợp.
+Bước 4
+Generate.
+Bước 5
+Nghe lại.
+Kiểm tra:
+•	Tên nhân vật.
+•	Tên phim.
+•	Thuật ngữ.
+•	Ngắt câu.
+•	Cảm xúc.
+•	Tốc độ.
+Bước 6
+Xuất File.
+Naming:
+[Episode]_[Section]_VO_V01
+Bước 7
+Upload vào Folder dự án.
+________________________________________
+IX. QUY TRÌNH 06 – PRODUCTION VIDEO
+I. Input
+Production chỉ bắt đầu khi có:
+•	Script Approved.
+•	Voice.
+•	Footage.
+•	Graphic Assets.
+•	BGM/SFX.
+•	Production Guideline.
+•	Reference.
+________________________________________
+II. Production
+Bước 1 – Chuẩn bị Source
+Tập hợp:
+•	Footage phim.
+•	Hình ảnh.
+•	Linh vật.
+•	Illustration.
+•	Graphic.
+•	Voice.
+•	Music.
+•	SFX.
+Bước 2 – Assembly
+Ghép theo Script.
+Không dựng theo cảm tính.
+Bước 3 – Visual
+Đảm bảo:
+•	Hình đúng nội dung Voice.
+•	Chuyển cảnh hợp lý.
+•	Không thiếu Footage.
+•	Không để frame lỗi.
+Bước 4 – Subtitle
+Kiểm tra:
+•	Chính tả.
+•	Timing.
+•	Font.
+•	Size.
+•	Safe Zone.
+Bước 5 – Audio
+Kiểm tra:
+•	Voice rõ.
+•	Nhạc không lấn Voice.
+•	SFX hợp lý.
+•	Không clip âm thanh.
+Bước 6 – Self-QC
+Producer tự kiểm tra trước khi nộp.
+________________________________________
+X. QUY TRÌNH 07 – EDITOR QC & HOÀN THIỆN
+I. Mục tiêu
+Biến Draft của Producer thành sản phẩm đủ tiêu chuẩn để Core duyệt.
+________________________________________
+II. QC
+Editor đối chiếu:
+VIDEO ↔ SCRIPT ↔ FORMAT ↔ GUIDELINE ↔ REFERENCE
+Content QC
+•	Đúng thông điệp.
+•	Không sai logic.
+•	Không thiếu nội dung.
+•	Hook đủ rõ.
+•	CTA đúng.
+Visual QC
+•	Footage.
+•	Layout.
+•	Graphic.
+•	Character.
+•	Subtitle.
+•	Transition.
+Audio QC
+•	Voice.
+•	BGM.
+•	SFX.
+•	Volume.
+Rhythm QC
+•	Không quá chậm.
+•	Không quá dồn.
+•	Có khoảng thở.
+•	Các đoạn chuyển logic.
+________________________________________
+III. Hoàn thiện
+Editor chỉnh trực tiếp các lỗi thuộc khâu Finalization.
+Sau đó xuất:
+FINAL REVIEW VERSION
+và gửi Core.
+________________________________________
+XI. QUY TRÌNH 08 – CORE DUYỆT
+
+XII. QUY TRÌNH 09 – ĐĂNG BÀI / PUBLISH
+Lên web dự án vào Trang đăng
+" Okay

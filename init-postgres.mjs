@@ -53,7 +53,10 @@ async function initSchema() {
     CREATE TABLE IF NOT EXISTS platform_channels (
       id VARCHAR(100) PRIMARY KEY,
       channel_group_id VARCHAR(100) NOT NULL,
-      platform_id VARCHAR(100) NOT NULL
+      platform_id VARCHAR(100) NOT NULL,
+      external_name TEXT,
+      external_url TEXT,
+      external_channel_id TEXT
     );
   `);
 
@@ -109,6 +112,7 @@ async function initSchema() {
       gate4_approved_by_email VARCHAR(255),
       gate5_approved_at VARCHAR(100),
       gate5_approved_by_email VARCHAR(255),
+      gate5_approved_final_url TEXT,
       core_approval_notes TEXT,
       -- Script 4-Column & Copyright (R3)
       script_data JSONB,
@@ -220,6 +224,73 @@ async function initSchema() {
     );
   `);
 
+  await sql.query(`
+    CREATE TABLE IF NOT EXISTS audio_jobs (
+      id VARCHAR(100) PRIMARY KEY,
+      idea_id VARCHAR(100) NOT NULL,
+      created_by_email VARCHAR(255) NOT NULL,
+      episode TEXT NOT NULL,
+      voice_id TEXT NOT NULL,
+      voice_name TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      model_version TEXT,
+      speed NUMERIC NOT NULL,
+      script_fingerprint VARCHAR(64) NOT NULL,
+      status VARCHAR(30) NOT NULL DEFAULT 'DRAFT',
+      total_segments INT NOT NULL DEFAULT 0,
+      completed_segments INT NOT NULL DEFAULT 0,
+      master_audio BYTEA,
+      master_mime_type VARCHAR(100),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await sql.query(`
+    CREATE TABLE IF NOT EXISTS audio_segments (
+      id VARCHAR(100) PRIMARY KEY,
+      job_id VARCHAR(100) NOT NULL REFERENCES audio_jobs(id) ON DELETE CASCADE,
+      position INT NOT NULL,
+      text TEXT NOT NULL,
+      text_fingerprint VARCHAR(64) NOT NULL,
+      status VARCHAR(30) NOT NULL DEFAULT 'IDLE',
+      error TEXT,
+      audio_data BYTEA,
+      mime_type VARCHAR(100),
+      attempts INT NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(job_id, position)
+    );
+  `);
+
+  await sql.query(`
+    CREATE TABLE IF NOT EXISTS publishing_jobs (
+      id VARCHAR(100) PRIMARY KEY,
+      idea_id VARCHAR(100) NOT NULL UNIQUE,
+      platform_channel_id VARCHAR(100) NOT NULL,
+      created_by_email VARCHAR(255) NOT NULL,
+      mode VARCHAR(20) NOT NULL DEFAULT 'MANUAL',
+      status VARCHAR(30) NOT NULL DEFAULT 'DRAFT',
+      package_version INT NOT NULL DEFAULT 1,
+      idempotency_key VARCHAR(160) NOT NULL UNIQUE,
+      final_asset_url TEXT NOT NULL,
+      destination_name TEXT,
+      destination_url TEXT,
+      title TEXT NOT NULL,
+      caption TEXT,
+      hashtags TEXT,
+      thumbnail TEXT,
+      scheduled_date DATE,
+      timezone VARCHAR(100) NOT NULL DEFAULT 'Asia/Bangkok',
+      external_url TEXT,
+      external_id TEXT,
+      last_error TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      published_at TIMESTAMPTZ
+    );
+  `);
+
   // Add new columns if they don't exist
   try {
     await sql.query(`ALTER TABLE pitching_batches ADD COLUMN category TEXT;`);
@@ -260,6 +331,15 @@ async function initSchema() {
   try {
     await sql.query(`ALTER TABLE channel_groups ADD COLUMN topic_branch TEXT;`);
   } catch (e) { /* ignores if exists */ }
+  try {
+    await sql.query(`ALTER TABLE platform_channels ADD COLUMN external_name TEXT;`);
+  } catch (e) { /* ignores if exists */ }
+  try {
+    await sql.query(`ALTER TABLE platform_channels ADD COLUMN external_url TEXT;`);
+  } catch (e) { /* ignores if exists */ }
+  try {
+    await sql.query(`ALTER TABLE platform_channels ADD COLUMN external_channel_id TEXT;`);
+  } catch (e) { /* ignores if exists */ }
 
   // SOP Migrations for existing databases
   const sopMigrations = [
@@ -275,6 +355,7 @@ async function initSchema() {
     "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS gate4_approved_by_email VARCHAR(255);",
     "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS gate5_approved_at VARCHAR(100);",
     "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS gate5_approved_by_email VARCHAR(255);",
+    "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS gate5_approved_final_url TEXT;",
     "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS core_approval_notes TEXT;",
     "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS script_data JSONB;",
     "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS copyright_commitment BOOLEAN DEFAULT FALSE;",
@@ -312,6 +393,9 @@ async function initSchema() {
     "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS metrics_ctr VARCHAR(50);",
     "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS metrics_comments INT DEFAULT 0;",
     "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS metrics_insights TEXT;",
+    "CREATE INDEX IF NOT EXISTS idx_audio_jobs_idea ON audio_jobs (idea_id, updated_at DESC);",
+    "CREATE INDEX IF NOT EXISTS idx_audio_segments_job ON audio_segments (job_id, position);",
+    "CREATE INDEX IF NOT EXISTS idx_publishing_jobs_status ON publishing_jobs (status, updated_at DESC);",
     "CREATE INDEX IF NOT EXISTS idx_ideas_parent_task_id ON ideas (parent_task_id);",
     "CREATE INDEX IF NOT EXISTS idx_ideas_active_gate ON ideas (active_gate);",
     "CREATE INDEX IF NOT EXISTS idx_ideas_platform_type ON ideas (platform_type);"

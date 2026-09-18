@@ -1,4 +1,4 @@
-import { getDb } from "../lib/db";
+import { ensureSchema, getDb } from "../lib/db";
 import { getCurrentMember } from "./auth-actions";
 import { recordAuditLog } from "./audit-actions";
 import { createNotification, sendDiscordWebhook, getWebhookUrlForPlatformChannel } from "./notification-actions";
@@ -10,6 +10,10 @@ function parseJsonSafe<T>(value: unknown, fallback: T): T {
   if (typeof value === "object") return value as T;
   if (typeof value !== "string" || !value.trim()) return fallback;
   try { return JSON.parse(value) as T; } catch { return fallback; }
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }
 
 // ==========================================
@@ -24,6 +28,7 @@ export async function approveGate4QcAction(ideaId: string): Promise<{ success: b
     }
 
     const sql = getDb();
+    await ensureSchema(sql);
     const rows = await sql.query(`SELECT * FROM ideas WHERE id = $1 LIMIT 1`, [ideaId]);
     const idea = rows[0];
     if (!idea) return { success: false, error: "Không tìm thấy ý tưởng" };
@@ -59,8 +64,8 @@ export async function approveGate4QcAction(ideaId: string): Promise<{ success: b
     await sendDiscordWebhook(`✅ QC checklist cho "${idea.title}" đã được ${member.name} duyệt.`, undefined, webhook, "general");
     revalidatePath("/");
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Lỗi khi duyệt QC" };
+  } catch (err: unknown) {
+    return { success: false, error: errorMessage(err, "Lỗi khi duyệt QC") };
   }
 }
 
@@ -81,12 +86,14 @@ export async function approveGate5CoreAction(ideaId: string, publishData: {
     }
 
     const sql = getDb();
+    await ensureSchema(sql);
     const rows = await sql.query(`SELECT * FROM ideas WHERE id = $1 LIMIT 1`, [ideaId]);
     const idea = rows[0];
     if (!idea) return { success: false, error: "Không tìm thấy ý tưởng" };
     if (idea.status !== "CORE_REVIEW" || idea.active_gate !== "GATE_5_CORE") {
       return { success: false, error: "Chỉ có thể publish khi ở Cổng 5 (Core Review)" };
     }
+    if (!idea.video_final_link?.trim()) return { success: false, error: "Chưa có bản final đã qua QC để Core duyệt." };
 
     const now = new Date().toISOString();
     await sql.query(
@@ -95,6 +102,7 @@ export async function approveGate5CoreAction(ideaId: string, publishData: {
          active_gate = 'READY_TO_PUBLISH',
          gate5_approved_at = $1,
          gate5_approved_by_email = $2,
+         gate5_approved_final_url = video_final_link,
          published_title = $3,
          published_thumbnail = $4,
          published_caption = $5,
@@ -118,8 +126,8 @@ export async function approveGate5CoreAction(ideaId: string, publishData: {
     await sendDiscordWebhook(`🚀 ${member.name} đã duyệt và publish video "${publishData.title}".`, undefined, webhook, "general");
     revalidatePath("/");
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Lỗi khi publish" };
+  } catch (err: unknown) {
+    return { success: false, error: errorMessage(err, "Lỗi khi publish") };
   }
 }
 
@@ -186,7 +194,7 @@ export async function createTikTokCutdownAction(ideaId: string, params: {
     await sendDiscordWebhook(`🎞️ TikTok cut‑down task "${parent.title}" đã được tạo bởi ${member.name}.`, undefined, webhook, "general");
     revalidatePath("/");
     return { success: true, tiktokTaskId };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Lỗi khi tạo TikTok" };
+  } catch (err: unknown) {
+    return { success: false, error: errorMessage(err, "Lỗi khi tạo TikTok") };
   }
 }

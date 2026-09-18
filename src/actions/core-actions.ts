@@ -2,7 +2,7 @@
 
 "use server";
 
-import { getDb } from "../lib/db";
+import { ensureSchema, getDb } from "../lib/db";
 import { getCurrentMember } from "./auth-actions";
 import { recordAuditLog } from "./audit-actions";
 import { sendDiscordWebhook, getWebhookUrlForPlatformChannel } from "./notification-actions";
@@ -12,7 +12,7 @@ import { revalidatePath } from "next/cache";
 async function getIdeaRow(ideaId: string) {
   const sql = getDb();
   const rows = await sql.query(`SELECT * FROM ideas WHERE id = $1 LIMIT 1`, [ideaId]);
-  return rows[0] as any;
+  return rows[0] as { active_gate?: string; status?: string; video_final_link?: string; platform_channel_id?: string; title?: string } | undefined;
 }
 
 /**
@@ -34,29 +34,32 @@ export async function approveCoreAction(
   if (idea.active_gate !== "GATE_5_CORE" || idea.status !== "CORE_REVIEW") {
     throw new Error("Idea không ở Gate 5 để duyệt Core");
   }
+  if (!idea.video_final_link?.trim()) throw new Error("Chưa có bản final đã qua QC để Core duyệt");
 
   const sql = getDb();
+  await ensureSchema(sql);
   const now = new Date().toISOString();
   await sql.query(
     `UPDATE ideas SET
        status = 'READY_TO_PUBLISH',
        active_gate = 'READY_TO_PUBLISH',
-       deadline_core = $1,
-       target_publish_date = $2,
-       published_title = $3,
-       published_thumbnail = $4,
-       published_caption = $5,
-       published_hashtags = $6,
-       updated_at = $7
+       gate5_approved_at = $1,
+       gate5_approved_by_email = $2,
+       gate5_approved_final_url = video_final_link,
+       target_publish_date = $3,
+       published_title = $4,
+       published_thumbnail = $5,
+       published_caption = $6,
+       published_hashtags = $7
      WHERE id = $8`,
     [
-      targetPublishDate?.trim() || null,
+      now,
+      member.id,
       targetPublishDate?.trim() || null,
       publishMetadata?.title || null,
       publishMetadata?.thumbnail || null,
       publishMetadata?.caption || null,
       publishMetadata?.hashtags || null,
-      now,
       ideaId,
     ]
   );

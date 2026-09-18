@@ -22,7 +22,7 @@ import {
   triggerDailyCronAction, reassignIdeaAction, updateIdeaDetailsAction, extendDeadlineAction,
   updateIdeaNoteAction, rateIdeaAction, cloneIdeaAction, submitScriptMatrixAction,
   approveGate2ScriptAction, updateChecklistAction, submitVideoWithChecklistAction,
-  approveGate4QcAction, approveGate5CoreAction, publishVideoAction,
+  approveGate4QcAction, approveGate5CoreAction,
   savePostPublishMetricsAction, createTikTokDerivativeAction
 } from "../../actions/idea-actions";
 import { 
@@ -37,7 +37,9 @@ import { createChecklistAction, updateChecklistStatusAction, deleteChecklistActi
 import { createPitchingBatchAction, closePitchingBatchAction, reopenPitchingBatchAction, deletePitchingBatchAction } from "../../actions/pitching-batch-actions";
 import { Member, Platform, ChannelGroup, PlatformChannel, Idea, CommentItem, AuditLogItem, NotificationItem, ChecklistItem, AppSettings, PitchingBatch, Role, ReferenceItem, ReferenceType } from "../../lib/types";
 import { FormattedText, ReferenceList, MultiReferenceEditor, parseReferences } from "../../lib/reference-utils";
-import ProductionTutorialView from "./ProductionTutorialView";
+import ProductionMapView from "./ProductionMapView";
+import IdeaComposer from "./IdeaComposer";
+import AudioStudio from "./AudioStudio";
 import ControlPanelView from "./ControlPanelView";
 
 /* ---------------------------------------------------------------------
@@ -90,14 +92,16 @@ export const CONTENT_PILLARS = [
   { value: "Content Đối tác", label: "6. Content cho đối tác — Hợp tác & Tài trợ", desc: "Nội dung hợp tác & tài trợ thương mại với các thương hiệu đối tác." }
 ];
 
-const STATUS_ORDER = ["PITCH", "ASSIGNMENT", "SCRIPT", "PRODUCTION", "QA", "COMPLETE"] as const;
+const STATUS_ORDER = ["PITCH", "ASSIGNMENT", "SCRIPT", "PRODUCTION", "QA", "CORE_REVIEW", "READY_TO_PUBLISH", "COMPLETE"] as const;
 const STATUS_LABEL: Record<string, string> = {
   PITCH: "Chờ duyệt Pitch",
   ASSIGNMENT: "Đã giao việc",
   SCRIPT: "Soạn kịch bản",
   PRODUCTION: "Đang sản xuất",
   QA: "Chờ duyệt QA",
-  COMPLETE: "Đã duyệt / Xong",
+  CORE_REVIEW: "Chờ Core duyệt",
+  READY_TO_PUBLISH: "Chờ hoàn tất",
+  COMPLETE: "Đã hoàn tất",
   ARCHIVED_IDEA: "Lưu trữ",
   CANCELLED: "Đã huỷ"
 };
@@ -108,6 +112,8 @@ const STATUS_COLORS: Record<string, { bg: string; fg: string; bd: string }> = {
   SCRIPT: { bg: "#E0E7FF", fg: "#3730A3", bd: "#C7D2FE" },        // Indigo nhạt
   PRODUCTION: { bg: "#F3E8FF", fg: "#6B21A8", bd: "#E9D5FF" },    // Tím nhạt
   QA: { bg: "#FEE2E2", fg: "#991B1B", bd: "#FECACA" },            // Đỏ nhạt / Đỏ đô
+  CORE_REVIEW: { bg: "#FEF3C7", fg: "#92400E", bd: "#FDE68A" },
+  READY_TO_PUBLISH: { bg: "#CCFBF1", fg: "#115E59", bd: "#99F6E4" },
   COMPLETE: { bg: "#DCFCE7", fg: "#166534", bd: "#BBF7D0" },      // Xanh lá nhạt / Xanh rừng
   ARCHIVED_IDEA: { bg: "#F1F5F9", fg: "#475569", bd: "#E2E8F0" }, // Xám nhạt
   CANCELLED: { bg: "#FEE2E2", fg: "#991B1B", bd: "#FECACA" }      // Đỏ nhạt
@@ -579,6 +585,21 @@ export default function ClientApp({
   // Tab navigation
   const [tab, setTab] = useState("dashboard"); // "dashboard" | "board" | "gantt" | "timeline" | "calendar" | "reports" | "members" | "portfolio"
   
+  useEffect(() => {
+    const sync = () => {
+      const view = new URLSearchParams(window.location.search).get("view");
+      if (view && ["dashboard","control","production_map","board","audio","calendar","gantt","timeline","reports","members","portfolio","notifications_tab"].includes(view)) setTab(view);
+      else setTab("dashboard");
+    };
+    sync(); window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
+  }, []);
+  function navigateView(view: string) {
+    setTab(view);
+    const url = new URL(window.location.href); url.searchParams.set("view", view);
+    window.history.pushState(null, "", url);
+  }
+
   // Slide-over & Modals
   const [openIdea, setOpenIdea] = useState<Idea | null>(null);
   const [showNewIdea, setShowNewIdea] = useState(false);
@@ -778,11 +799,12 @@ export default function ClientApp({
     { id: "dashboard", label: "Việc của tôi", icon: CheckSquare, count: myActionTasks.length },
     { id: "control", label: "Trang điều khiển", icon: Sliders, count: 0 },
     { id: "notifications_tab", label: "Inbox (Thông báo)", icon: Inbox, count: unreadNotifications.length },
+    { id: "production_map", label: "Bản đồ quy trình", icon: Compass, count: 0 },
   ];
 
   const NAV_PRODUCTION = [
-    { id: "tutorial", label: "Tutorial vận hành", icon: Play },
-    { id: "board", label: "Pipeline Ý tưởng (Pitch)", icon: LayoutGrid },
+    { id: "board", label: "Ý tưởng & sản xuất", icon: LayoutGrid },
+    { id: "audio", label: "Phòng âm thanh", icon: Play },
     { id: "calendar", label: "Lịch phát hành", icon: CalendarDays },
     { id: "gantt", label: "Gantt theo Kênh", icon: Calendar },
     { id: "timeline", label: "Timeline Tổng", icon: Layers },
@@ -794,7 +816,7 @@ export default function ClientApp({
   const activeTabTitle = [...NAV_PERSONAL, ...NAV_PRODUCTION].find(t => t.id === tab)?.label || "Bàn làm việc";
 
   return (
-    <div className="min-h-screen flex bg-[#F8FAFC] text-[#0F172A]" style={{ fontFamily: "var(--font-sans, sans-serif)" }}>
+    <div className="workspace-shell min-h-screen flex bg-[#F8FAFC] text-[#0F172A]" style={{ fontFamily: "var(--font-sans, sans-serif)" }}>
 
       {/* MOBILE SIDEBAR OVERLAY BACKDROP */}
       {sidebarOpen && (
@@ -843,7 +865,7 @@ export default function ClientApp({
                       if (item.id === "notifications_tab") {
                         setShowNotificationsFlyout(true);
                       } else {
-                        setTab(item.id);
+                        navigateView(item.id);
                       }
                       setSidebarOpen(false);
                     }}
@@ -880,7 +902,7 @@ export default function ClientApp({
                 return (
                   <button
                     key={item.id}
-                    onClick={() => { setTab(item.id); setSidebarOpen(false); }}
+                    onClick={() => { navigateView(item.id); setSidebarOpen(false); }}
                     className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       isActive 
                         ? "bg-white text-[#0F172A] saas-shadow font-semibold" 
@@ -901,7 +923,7 @@ export default function ClientApp({
           {/* Discord Status */}
           {settings.discordMuted ? (
             <button 
-              onClick={() => setTab("control")}
+              onClick={() => navigateView("control")}
               className="w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] bg-amber-50 text-amber-900 border border-amber-300 font-semibold hover:bg-amber-100 transition-colors"
               title="Thông báo Discord đang bị TẮT. Bấm để mở Trang điều khiển.">
               <span className="flex items-center gap-1.5">
@@ -912,7 +934,7 @@ export default function ClientApp({
             </button>
           ) : settings.discordWebhookUrl ? (
             <button 
-              onClick={() => setTab("control")}
+              onClick={() => navigateView("control")}
               className="w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] bg-emerald-50 text-emerald-800 border border-emerald-200 font-medium hover:bg-emerald-100 transition-colors"
               title="Discord đã kết nối. Bấm để mở Trang điều khiển.">
               <span className="flex items-center gap-1.5">
@@ -924,7 +946,7 @@ export default function ClientApp({
           ) : (
             actor.role === "Core" && (
               <button 
-                onClick={() => setTab("control")}
+                onClick={() => navigateView("control")}
                 className="w-full flex items-center justify-center gap-1.5 px-2 py-1 rounded-md text-[11px] bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-colors font-medium">
                 <Plus size={12} /> Cài Discord Webhook
               </button>
@@ -1149,7 +1171,8 @@ export default function ClientApp({
            MAIN STAGE VIEWPORT (#F8FAFC)
         ------------------------------------------------------------- */}
         <main className="flex-1 p-3 sm:p-5 max-w-7xl w-full mx-auto">
-          {tab === "tutorial" && <ProductionTutorialView />}
+          {tab === "production_map" && <ProductionMapView />}
+          {tab === "audio" && <AudioStudio memberId={actor.id} ideas={ideas} platformChannels={platformChannels} />}
           {tab === "dashboard" && (
             <DashboardView 
               ideas={ideas}
@@ -1360,177 +1383,8 @@ export default function ClientApp({
 
       {/* NEW IDEA MODAL */}
       {showNewIdea && (
-        <Modal title="Nộp ý tưởng mới (Pitching)" onClose={() => setShowNewIdea(false)}>
-          <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => { 
-            e.preventDefault(); 
-            const form = e.currentTarget;
-            const title = (form.elements.namedItem("title") as HTMLInputElement).value;
-            const description = (form.elements.namedItem("description") as HTMLTextAreaElement).value;
-            const logline = (form.elements.namedItem("logline") as HTMLInputElement)?.value || "";
-            const referenceLinks = (form.elements.namedItem("referenceLinks") as HTMLInputElement)?.value || "";
-            const angle = (form.elements.namedItem("angle") as HTMLInputElement)?.value || "";
-            const keyMessage = (form.elements.namedItem("keyMessage") as HTMLInputElement)?.value || "";
-            const contentPillar = (form.elements.namedItem("contentPillar") as HTMLSelectElement)?.value || "";
-            const platformChannelId = (form.elements.namedItem("platformChannel") as HTMLSelectElement).value;
-
-            if (!description.trim()) {
-              alert("Mô tả ý tưởng là bắt buộc.");
-              return;
-            }
-
-            runAction(submitIdeaAction, title, description, platformChannelId, logline, referenceLinks, angle, keyMessage, contentPillar);
-            setShowNewIdea(false);
-            showToast(`Đã nộp ý tưởng "${title}"`);
-          }}>
-            <div className="space-y-3">
-              {(() => {
-                const openBatches = pitchingBatches?.filter((b: PitchingBatch) => b.status === "OPEN") || [];
-                if (openBatches.length === 0) return null;
-                return (
-                  <div className="space-y-2 mb-2">
-                    <div className="text-[11px] font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
-                      <Flame size={13} className="text-amber-500 animate-pulse" /> Các đợt Call Pitching đang mở ({openBatches.length}):
-                    </div>
-                    {openBatches.map((batch: PitchingBatch, idx: number) => {
-                      const ch = batch.channelGroupId ? channelGroupById[batch.channelGroupId] : null;
-                      return (
-                        <div key={batch.id || idx} className="bg-amber-50/90 border border-amber-200 rounded-xl p-3 text-xs space-y-1.5">
-                          <div className="flex items-center justify-between gap-1 flex-wrap">
-                            <span className="font-bold text-amber-900 flex items-center gap-1 text-[11.5px]">
-                              {openBatches.length > 1 ? `${idx + 1}. ` : ''}{batch.title}
-                            </span>
-                            <div className="flex items-center gap-1 flex-wrap">
-                              {batch.category && (
-                                <span className="bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded text-[10px] font-bold shrink-0">
-                                  🎯 {batch.category}
-                                </span>
-                              )}
-                              {ch && (
-                                <span className="bg-slate-200/80 text-slate-800 px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0">
-                                  📺 {ch.name}
-                                </span>
-                              )}
-                              <span className="text-[10px] text-amber-800 font-mono bg-amber-100 px-1.5 py-0.5 rounded shrink-0">
-                                Hạn: {batch.deadline}
-                              </span>
-                            </div>
-                          </div>
-                          {batch.description && (
-                            <div className="text-slate-700 leading-snug"><span className="font-semibold text-slate-900">Yêu cầu:</span> <FormattedText text={batch.description} /></div>
-                          )}
-                          {batch.exampleAngles && (
-                            <div className="text-slate-700 bg-amber-100/60 p-2 rounded-lg border border-amber-200/60 text-[11px] leading-relaxed">
-                              <span className="font-semibold text-amber-900 block mb-0.5">💡 Gợi ý đào sâu & Ví dụ:</span>
-                              <span className="italic">{batch.exampleAngles}</span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-
-              <div>
-                <FieldLabel required>Tên ý tưởng ngắn gọn</FieldLabel>
-                <TextInput id="title" autoFocus required placeholder="VD: Phân tích tâm lý nhân vật Joker..." />
-              </div>
-
-              <div>
-                <FieldLabel>Logline (tóm tắt nội dung pitch)</FieldLabel>
-                <TextInput id="logline" placeholder="Tóm tắt ngắn gọn 1–2 câu về nội dung pitch..." />
-              </div>
-
-              <div>
-                <FieldLabel required>Mô tả chi tiết nội dung (Content)</FieldLabel>
-                <TextArea id="description" required rows={3} placeholder="Chi tiết kịch bản dự kiến, các ý chính cần khai thác (hỗ trợ dán link ở bất kỳ đâu trong mô tả)..." />
-              </div>
-
-              <div>
-                <MultiReferenceEditor 
-                  id="referenceLinks" 
-                  label="Link tham khảo của Ý tưởng (Reference)" 
-                  helperText="Có thể thêm 2-3 hoặc nhiều link tham khảo (Video mẫu, Docs kịch bản, Drive, Nhạc, Moodboard...)"
-                  placeholder="Link video mẫu, bài viết, nhạc nền, tài liệu..." 
-                />
-              </div>
-
-              <div>
-                <FieldLabel>Hướng triển khai (Angle)</FieldLabel>
-                <TextInput id="angle" placeholder="Góc nhìn, hướng tiếp cận, phong cách kể chuyện..." />
-              </div>
-
-              <div>
-                <FieldLabel>Key message</FieldLabel>
-                <TextInput id="keyMessage" placeholder="Thông điệp chính muốn truyền tải..." />
-              </div>
-
-              <div>
-                <FieldLabel>Tuyến bài nội dung (Content Pillar)</FieldLabel>
-                <Select id="contentPillar">
-                  <option value="">-- Chọn tuyến bài nội dung --</option>
-                  {CONTENT_PILLARS.map(p => (
-                    <option key={p.value} value={p.value}>{p.label}</option>
-                  ))}
-                </Select>
-              </div>
-
-              <div>
-                <FieldLabel required>Kênh & Nền tảng</FieldLabel>
-                <Select 
-                  id="platformChannel" 
-                  required
-                  value={selectedPcId || platformChannels[0]?.id}
-                  onChange={(e: any) => setSelectedPcId(e.target.value)}
-                >
-                  {platformChannels.map((pc) => {
-                    const ch = channelGroupById[pc.channelGroupId];
-                    const pl = platformById[pc.platformId];
-                    return (
-                      <option key={pc.id} value={pc.id}>
-                        {ch?.name || "Kênh"} — {pl?.name || "Nền tảng"} ({pl?.defaultDurationDays || 2} ngày)
-                      </option>
-                    );
-                  })}
-                </Select>
-
-                {(() => {
-                  const activePcId = selectedPcId || platformChannels[0]?.id;
-                  const currentPc = pcById[activePcId];
-                  const currentCh = currentPc ? channelGroupById[currentPc.channelGroupId] : null;
-                  if (!currentCh) return null;
-                  if (!currentCh.description && !currentCh.videoFormat && !currentCh.referenceVideoLink) return null;
-                  return (
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-2 mt-2.5">
-                      <div className="flex items-center gap-1.5 text-slate-800 font-semibold text-[11px] uppercase tracking-wider">
-                        <Sparkles size={13} className="text-amber-500 shrink-0" />
-                        <span>Định hướng & Reference Kênh: {currentCh.name}</span>
-                      </div>
-                      {currentCh.description && (
-                        <div className="text-slate-700 leading-relaxed">
-                          <span className="font-semibold text-slate-900">Mô tả định hướng:</span>{" "}
-                          <FormattedText text={currentCh.description} />
-                        </div>
-                      )}
-                      {currentCh.videoFormat && (
-                        <p className="text-slate-700"><span className="font-semibold text-slate-900">Dạng video làm:</span> {currentCh.videoFormat}</p>
-                      )}
-                      {currentCh.referenceVideoLink && (
-                        <div className="pt-1">
-                          <ReferenceList references={currentCh.referenceVideoLink} title="Tài liệu & Video tham khảo Kênh" />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-slate-100">
-              <Btn onClick={() => setShowNewIdea(false)}>Huỷ</Btn>
-              <Btn tone="primary" type="submit" loading={isPending}>Nộp ý tưởng</Btn>
-            </div>
-          </form>
+        <Modal title="Viết ý tưởng mới" wide onClose={() => setShowNewIdea(false)}>
+          <IdeaComposer memberId={actor.id} channels={channelGroups} platforms={platforms} platformChannels={platformChannels} batches={pitchingBatches} onDone={(title) => { setShowNewIdea(false); showToast('Đã nộp ý tưởng “' + title + '”'); }} />
         </Modal>
       )}
 
@@ -1643,15 +1497,15 @@ export default function ClientApp({
             
             runAction(qaPassAction, qaCompleteIdeaTarget.id, publishedLink);
             setQaCompleteIdeaTarget(null);
-            showToast("Đã xác nhận QA ĐẠT và cập nhật link xuất bản");
+            showToast("Đã xác nhận QA ĐẠT và cập nhật link lưu trữ sản phẩm");
           }}>
             <div className="space-y-3">
               <div className="p-3 rounded-lg bg-emerald-50 text-emerald-800 text-xs border border-emerald-200">
-                🎉 Bạn đang xác nhận video đạt chuẩn chất lượng xuất bản. Vui lòng nhập link bài đăng thực tế (hoặc link lưu trữ sản phẩm cuối).
+                🎉 Bạn đang xác nhận video đạt chuẩn chất lượng. Vui lòng nhập link lưu trữ sản phẩm cuối.
               </div>
               <div>
-                <FieldLabel required>Link đăng video chính thức (TikTok / YouTube / FB / Drive)</FieldLabel>
-                <TextInput id="publishedLink" autoFocus required placeholder="https://www.tiktok.com/@ynda/video/..." defaultValue={qaCompleteIdeaTarget.publishedLink || ""} />
+                <FieldLabel required>Link lưu trữ sản phẩm cuối</FieldLabel>
+                <TextInput id="publishedLink" autoFocus required placeholder="https://drive.google.com/file/..." defaultValue={qaCompleteIdeaTarget.publishedLink || ""} />
               </div>
             </div>
 
@@ -3825,7 +3679,6 @@ function YndaWorkflowPanel({ idea, actor, runAction }: any) {
   const [draftLink, setDraftLink] = useState(idea.videoDraftLink || "");
   const [sourceLink, setSourceLink] = useState(idea.sourceProjectLink || "");
   const [finalLink, setFinalLink] = useState(idea.videoFinalLink || "");
-  const [publishUrl, setPublishUrl] = useState(idea.publishedLink || "");
   const gate = idea.activeGate || idea.active_gate || "GATE_1_IDEA";
   const isEditor = actor.role === "E" || actor.role === "Core";
   const checklist = (kind: "production" | "qc" | "tiktok", items: any[] | undefined, title: string) => {
@@ -3863,7 +3716,7 @@ function YndaWorkflowPanel({ idea, actor, runAction }: any) {
     {gate === "GATE_3_PRODUCTION" && <><>{checklist("production", idea.productionChecklist, "Production checklist · phải hoàn tất trước bàn giao")}</><div className="grid grid-cols-2 gap-2"><TextInput value={draftLink} onChange={(e:any) => setDraftLink(e.target.value)} placeholder="Link video draft *"/><TextInput value={sourceLink} onChange={(e:any) => setSourceLink(e.target.value)} placeholder="Link source project *"/></div><Btn small tone="primary" onClick={() => runAction(submitVideoWithChecklistAction, idea.id, { videoDraftLink: draftLink, sourceProjectLink: sourceLink, assetFolderLink: idea.assetFolderLink || "" })}><Upload size={12}/> Bàn giao sang QC</Btn></>}
     {gate === "GATE_4_QC" && <><>{checklist("qc", idea.qcChecklist, "Editor QC checklist · Editor hoàn thiện trực tiếp")}</><TextInput value={finalLink} onChange={(e:any) => setFinalLink(e.target.value)} placeholder="Link video final sau QC"/>{isEditor && <Btn small tone="success" onClick={() => runAction(approveGate4QcAction, idea.id, finalLink)}><ShieldCheck size={12}/> Gửi Core duyệt</Btn>}</>}
     {gate === "GATE_5_CORE" && actor.role === "Core" && <Btn small tone="primary" onClick={() => runAction(approveGate5CoreAction, idea.id, "Duyệt chốt từ SOP console")}><CheckCircle2 size={12}/> Core duyệt chốt</Btn>}
-    {gate === "READY_TO_PUBLISH" && <div className="space-y-2"><TextInput value={publishUrl} onChange={(e:any) => setPublishUrl(e.target.value)} placeholder="URL bài đăng chính thức"/><Btn small tone="primary" onClick={() => runAction(publishVideoAction, idea.id, { publishedUrl: publishUrl, publishedTitle: idea.title, publishedCaption: idea.publishedCaption || "", publishedHashtags: idea.publishedHashtags || "" })}>Publish</Btn></div>}
+    {gate === "READY_TO_PUBLISH" && <p className="text-xs text-slate-600">Công việc cũ đang chờ hoàn tất. Từ nay Core duyệt chốt ở Cổng 5 sẽ tự khép công việc, không còn bước đăng lên nền tảng.</p>}
     {gate === "PUBLISHED" && <PublishedTools idea={idea} actor={actor} runAction={runAction} />}
   </section>;
 }
@@ -3942,6 +3795,7 @@ function BoardView({
 
   return (
     <div className="space-y-4">
+      <div className="workbench page-heading"><div><span className="eyebrow">NỘI DUNG / TIẾN ĐỘ</span><h1>Ý tưởng & sản xuất</h1><p>Theo dõi từng lần bàn giao, từ đề xuất đến video đã đăng.</p></div><button className="primary-button" onClick={onNewIdea}><Plus size={16}/> Viết idea</button></div>
       {/* TOP CONTROLS & FILTER BAR */}
       <div className="p-3 sm:p-3.5 rounded-xl border border-[#E2E8F0] bg-white saas-shadow flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
         <div className="flex items-center gap-2">
@@ -3995,7 +3849,7 @@ function BoardView({
       </div>
 
       {/* KANBAN BOARD COLUMNS */}
-      <div className="flex md:grid md:grid-cols-3 lg:grid-cols-6 gap-3.5 overflow-x-auto pb-4 no-scrollbar -mx-1 px-1 sm:mx-0 sm:px-0 snap-x">
+      <div className="flex gap-3.5 overflow-x-auto pb-4 no-scrollbar -mx-1 px-1 sm:mx-0 sm:px-0 snap-x">
         {STATUS_ORDER.map((statusKey) => {
           const colIdeas = filteredIdeas.filter((i: Idea) => i.status === statusKey);
           const colStyle = STATUS_COLORS[statusKey];

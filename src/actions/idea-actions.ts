@@ -1,11 +1,12 @@
 "use server";
 
-import { getDb } from "../lib/db";
+import { ensureSchema, getDb } from "../lib/db";
 import { getCurrentMember } from "./auth-actions";
 import { recordAuditLog } from "./audit-actions";
 import { createNotification, sendDiscordWebhook, getWebhookUrlForPlatformChannel } from "./notification-actions";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
+import { isHttpUrl } from "../lib/workflow-validation";
 import { 
   ScriptData, 
   ChecklistItem, 
@@ -60,7 +61,8 @@ export async function submitIdeaAction(
   referenceLinks?: string,
   angle?: string,
   keyMessage?: string,
-  contentPillar?: string
+  contentPillar?: string,
+  pitchingBatchId?: string
 ) {
   const member = await getCurrentMember();
   if (!member) throw new Error("Chưa đăng nhập");
@@ -78,6 +80,27 @@ export async function submitIdeaAction(
   }
 
   const sql = getDb();
+  const selectedChannels = await sql.query(
+    'SELECT pc.channel_group_id, p.name FROM platform_channels pc JOIN channel_groups c ON c.id=pc.channel_group_id JOIN platforms p ON p.id=pc.platform_id WHERE pc.id=$1 AND c.archived=false', [platformChannelId.trim()]
+  );
+  if (!selectedChannels.length) throw new Error("Kênh không tồn tại hoặc đã lưu trữ. Vui lòng chọn lại.");
+  if (title.length > 250 || description.length > 30000) throw new Error("Tên tối đa 250 ký tự, nội dung tối đa 30.000 ký tự.");
+  if (referenceLinks?.trim()) {
+    let references;
+    try { references = JSON.parse(referenceLinks); } catch { references = [{url: referenceLinks.trim()}]; }
+    if (!Array.isArray(references) || references.some((r: {url?:string}) => !r || typeof r.url !== "string" || !isHttpUrl(r.url))) throw new Error("Mỗi reference cần là một đường dẫn http/https hợp lệ.");
+  }
+  if (pitchingBatchId) {
+    const batches=await sql.query('SELECT status, deadline, channel_group_id FROM pitching_batches WHERE id=$1',[pitchingBatchId]);
+    const batch=batches[0];
+    if(!batch || batch.status!=="OPEN") throw new Error("Đợt pitching đã đóng hoặc không còn tồn tại.");
+    const deadline=String(batch.deadline || "");
+    const cutoff=/^\d{4}-\d{2}-\d{2}$/.test(deadline) ? new Date(deadline + "T23:59:59+07:00") : new Date(deadline);
+    if(!Number.isNaN(cutoff.getTime()) && cutoff.getTime()<Date.now()) throw new Error("Đợt pitching đã hết hạn. Chọn đợt khác hoặc liên hệ Editor/Core.");
+    if(batch.channel_group_id && batch.channel_group_id!==selectedChannels[0].channel_group_id) throw new Error("Đợt pitching không thuộc kênh đã chọn.");
+  }
+  const platformName=String(selectedChannels[0].name).toLowerCase();
+  const platformType=platformName.includes("tiktok") ? "TIKTOK_CUTDOWN" : platformName.includes("facebook") ? "FACEBOOK_REELS" : "YOUTUBE_MASTER";
   const ideaId = crypto.randomUUID();
   const now = new Date().toISOString();
 
@@ -88,14 +111,14 @@ export async function submitIdeaAction(
       logline, reference_links, angle, key_message, content_pillar,
       script_status, script_locked, platform_type,
       copyright_footage, copyright_music, copyright_mascot,
-      production_checklist, qc_checklist
+      production_checklist, qc_checklist, pitching_batch_id
     ) VALUES (
       $1, $2, $3, $4, $5,
       $6, $7, $8, $9, $10,
       $11, $12, $13, $14, $15,
       $16, $17, $18,
       $19, $20, $21,
-      $22, $23
+      $22, $23, $24
     )`,
     [
       ideaId,
@@ -115,12 +138,13 @@ export async function submitIdeaAction(
       contentPillar?.trim() || null,
       "DRAFT",
       false,
-      "YOUTUBE_MASTER",
+      platformType,
       "PENDING",
       "PENDING",
       "OFFICIAL",
       JSON.stringify(DEFAULT_PRODUCTION_CHECKLIST),
-      JSON.stringify(DEFAULT_QC_CHECKLIST)
+      JSON.stringify(DEFAULT_QC_CHECKLIST),
+      pitchingBatchId || null
     ]
   );
 
@@ -170,6 +194,7 @@ export async function approveGate1IdeaAction(
     }
 
     const sql = getDb();
+    await ensureSchema(sql);
     const now = new Date().toISOString();
     const deadlineVal = deadlineScript?.trim() || null;
 
@@ -1029,19 +1054,22 @@ export async function approveGate5CoreAction(
     const row = await getIdeaRow(ideaId);
     if (!row) return { success: false, error: "Không tìm thấy ý tưởng" };
 
-    if (row.active_gate !== "GATE_5_CORE" && row.status !== "CORE_REVIEW" && !row.gate4_approved_at) {
+    if (row.active_gate !== "GATE_5_CORE" || row.status !== "CORE_REVIEW" || !row.gate4_approved_at) {
       return { success: false, error: "Video chưa qua Cổng 4 (QC của Editor), không thể trình duyệt Core." };
     }
+    if (!row.video_final_link?.trim()) return { success: false, error: "Chưa có link bản final đã qua QC để Core duyệt." };
 
     const sql = getDb();
+    await ensureSchema(sql);
     const now = new Date().toISOString();
 
     await sql.query(
-      `UPDATE ideas SET 
-         status = 'READY_TO_PUBLISH',
-         active_gate = 'READY_TO_PUBLISH',
+      `UPDATE ideas SET
+         status = 'COMPLETE',
+         active_gate = 'PUBLISHED',
          gate5_approved_at = $1,
          gate5_approved_by_email = $2,
+         gate5_approved_final_url = video_final_link,
          core_approval_notes = $3,
          credits_approved_by_email = $2
        WHERE id = $4`,
@@ -1053,7 +1081,7 @@ export async function approveGate5CoreAction(
       ]
     );
 
-    await recordAuditLog(ideaId, member.id, "Cổng 5: Core duyệt chốt video Master -> READY_TO_PUBLISH", {
+    await recordAuditLog(ideaId, member.id, "Cổng 5: Core duyệt chốt video -> COMPLETE", {
       coreNotes: notes?.trim() || null,
       approvedBy: member.id,
       timestamp: now
@@ -1064,13 +1092,13 @@ export async function approveGate5CoreAction(
         row.assigned_to_email,
         'qa_pass',
         ideaId,
-        `🎉 Core ${member.name} đã phê duyệt chốt video Master "${row.title}"! Task sẵn sàng để xuất bản.`
+        `🎉 Core ${member.name} đã phê duyệt chốt video "${row.title}"! Công việc đã hoàn thành.`
       );
     }
 
     const channelWebhook = await getWebhookUrlForPlatformChannel(row.platform_channel_id);
     await sendDiscordWebhook(
-      `👑 **CORE PHÊ DUYỆT CHỐT:** Video Master **"${row.title}"** đã được Core **${member.name}** thông qua!\n${notes ? `> Ghi chú: ${notes.trim()}\n` : ''}Trạng thái: SẴN SÀNG XUẤT BẢN.`,
+      `👑 **CORE PHÊ DUYỆT CHỐT:** Video **"${row.title}"** đã được Core **${member.name}** thông qua!\n${notes ? `> Ghi chú: ${notes.trim()}\n` : ''}Trạng thái: HOÀN THÀNH.`,
       undefined,
       channelWebhook,
       'general'
@@ -1175,97 +1203,6 @@ export async function qaFailAction(ideaId: string, qaFeedback: string) {
     'general'
   );
   revalidatePath("/");
-}
-
-// ==========================================
-// 7. PUBLISH VIDEO ACTION
-// ==========================================
-
-export async function publishVideoAction(
-  ideaId: string, 
-  publishData: { 
-    publishedUrl: string; 
-    publishedTitle?: string; 
-    publishedThumbnail?: string; 
-    publishedCaption?: string; 
-    publishedHashtags?: string;
-  }
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const member = await getCurrentMember();
-    if (!member) return { success: false, error: "Chưa đăng nhập" };
-
-    const row = await getIdeaRow(ideaId);
-    if (!row) return { success: false, error: "Không tìm thấy ý tưởng" };
-
-    // Strict Gating R2 & AC: Publish is locked until Gate 5 Core approval
-    if (row.active_gate !== "READY_TO_PUBLISH" && !row.gate5_approved_at) {
-      return { 
-        success: false, 
-        error: "Trạng thái Publish bị khóa cho đến khi Core thực hiện thao tác duyệt chốt Cổng 5." 
-      };
-    }
-
-    if (!publishData.publishedUrl || !publishData.publishedUrl.trim() || !isValidUrl(publishData.publishedUrl.trim())) {
-      return { 
-        success: false, 
-        error: "Bắt buộc phải nhập URL bài đăng chính thức hợp lệ (publishedUrl)." 
-      };
-    }
-
-    const sql = getDb();
-    const now = new Date().toISOString();
-    const todayStr = now.slice(0, 10);
-
-    await sql.query(
-      `UPDATE ideas SET 
-         status = 'COMPLETE',
-         active_gate = 'PUBLISHED',
-         published_link = $1,
-         published_title = COALESCE($2, published_title),
-         published_thumbnail = COALESCE($3, published_thumbnail),
-         published_caption = COALESCE($4, published_caption),
-         published_hashtags = COALESCE($5, published_hashtags),
-         scheduled_post_date = COALESCE(scheduled_post_date, $6)
-       WHERE id = $7`,
-      [
-        publishData.publishedUrl.trim(),
-        publishData.publishedTitle?.trim() || null,
-        publishData.publishedThumbnail?.trim() || null,
-        publishData.publishedCaption?.trim() || null,
-        publishData.publishedHashtags?.trim() || null,
-        todayStr,
-        ideaId
-      ]
-    );
-
-    await recordAuditLog(ideaId, member.id, "Xuất bản video chính thức -> COMPLETE", {
-      publishedUrl: publishData.publishedUrl.trim(),
-      publishedTitle: publishData.publishedTitle?.trim() || null
-    });
-
-    if (row.assigned_to_email) {
-      await createNotification(
-        row.assigned_to_email,
-        'info',
-        ideaId,
-        `🚀 Video "${row.title}" đã chính thức xuất bản thành công!`
-      );
-    }
-
-    const channelWebhook = await getWebhookUrlForPlatformChannel(row.platform_channel_id);
-    await sendDiscordWebhook(
-      `🚀 **ĐÃ XUẤT BẢN:** Video **"${publishData.publishedTitle || row.title}"** đã chính thức lên sóng!\n🔗 Xem ngay: ${publishData.publishedUrl.trim()}`,
-      undefined,
-      channelWebhook,
-      'general'
-    );
-
-    revalidatePath("/");
-    return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Có lỗi xảy ra khi xuất bản video" };
-  }
 }
 
 // ==========================================

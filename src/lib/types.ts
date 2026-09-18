@@ -42,6 +42,9 @@ export interface PlatformChannel {
   id: string;
   channelGroupId: string;
   platformId: string;
+  externalName?: string;
+  externalUrl?: string;
+  externalChannelId?: string;
 }
 
 export type IdeaStatus = 
@@ -155,6 +158,7 @@ export interface Idea {
   gate4ApprovedByEmail?: string;
   gate5ApprovedAt?: string;
   gate5ApprovedByEmail?: string;
+  gate5ApprovedFinalUrl?: string;
   coreApprovalNotes?: string;
 
   // Script 4-Column Matrix & Copyright (R3)

@@ -5,7 +5,9 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   serverExternalPackages: ["firebase-admin"],
+  outputFileTracingIncludes: {
+    "/api/production-map": ["./index.html"],
+  },
 };
 
 export default nextConfig;
-

@@ -78,6 +78,9 @@ export async function ensureSchema(sql: any): Promise<void> {
         'ALTER TABLE channel_groups ADD COLUMN IF NOT EXISTS video_format TEXT;',
         'ALTER TABLE channel_groups ADD COLUMN IF NOT EXISTS discord_webhook_url TEXT;',
         'ALTER TABLE channel_groups ADD COLUMN IF NOT EXISTS topic_branch TEXT;',
+        'ALTER TABLE platform_channels ADD COLUMN IF NOT EXISTS external_name TEXT;',
+        'ALTER TABLE platform_channels ADD COLUMN IF NOT EXISTS external_url TEXT;',
+        'ALTER TABLE platform_channels ADD COLUMN IF NOT EXISTS external_channel_id TEXT;',
         // SOP Gating and State Machine (R2)
         "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS active_gate VARCHAR(50) DEFAULT 'GATE_1_IDEA';",
         "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS gate1_approved_at VARCHAR(100);",
@@ -91,6 +94,7 @@ export async function ensureSchema(sql: any): Promise<void> {
         "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS gate4_approved_by_email VARCHAR(255);",
         "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS gate5_approved_at VARCHAR(100);",
         "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS gate5_approved_by_email VARCHAR(255);",
+        "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS gate5_approved_final_url TEXT;",
         "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS core_approval_notes TEXT;",
         // Script 4-Column & Copyright (R3)
         "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS script_data JSONB;",
@@ -133,7 +137,69 @@ export async function ensureSchema(sql: any): Promise<void> {
         "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS metrics_ctr VARCHAR(50);",
         "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS metrics_comments INT DEFAULT 0;",
         "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS metrics_insights TEXT;",
+        // Persistent audio workflow. Audio bytes stay private in Postgres so a reload does not lose outputs.
+        `CREATE TABLE IF NOT EXISTS audio_jobs (
+          id VARCHAR(100) PRIMARY KEY,
+          idea_id VARCHAR(100) NOT NULL,
+          created_by_email VARCHAR(255) NOT NULL,
+          episode TEXT NOT NULL,
+          voice_id TEXT NOT NULL,
+          voice_name TEXT NOT NULL,
+          provider TEXT NOT NULL,
+          model_version TEXT,
+          speed NUMERIC NOT NULL,
+          script_fingerprint VARCHAR(64) NOT NULL,
+          status VARCHAR(30) NOT NULL DEFAULT 'DRAFT',
+          total_segments INT NOT NULL DEFAULT 0,
+          completed_segments INT NOT NULL DEFAULT 0,
+          master_audio BYTEA,
+          master_mime_type VARCHAR(100),
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );`,
+        `CREATE TABLE IF NOT EXISTS audio_segments (
+          id VARCHAR(100) PRIMARY KEY,
+          job_id VARCHAR(100) NOT NULL REFERENCES audio_jobs(id) ON DELETE CASCADE,
+          position INT NOT NULL,
+          text TEXT NOT NULL,
+          text_fingerprint VARCHAR(64) NOT NULL,
+          status VARCHAR(30) NOT NULL DEFAULT 'IDLE',
+          error TEXT,
+          audio_data BYTEA,
+          mime_type VARCHAR(100),
+          attempts INT NOT NULL DEFAULT 0,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          UNIQUE(job_id, position)
+        );`,
+        `CREATE TABLE IF NOT EXISTS publishing_jobs (
+          id VARCHAR(100) PRIMARY KEY,
+          idea_id VARCHAR(100) NOT NULL UNIQUE,
+          platform_channel_id VARCHAR(100) NOT NULL,
+          created_by_email VARCHAR(255) NOT NULL,
+          mode VARCHAR(20) NOT NULL DEFAULT 'MANUAL',
+          status VARCHAR(30) NOT NULL DEFAULT 'DRAFT',
+          package_version INT NOT NULL DEFAULT 1,
+          idempotency_key VARCHAR(160) NOT NULL UNIQUE,
+          final_asset_url TEXT NOT NULL,
+          destination_name TEXT,
+          destination_url TEXT,
+          title TEXT NOT NULL,
+          caption TEXT,
+          hashtags TEXT,
+          thumbnail TEXT,
+          scheduled_date DATE,
+          timezone VARCHAR(100) NOT NULL DEFAULT 'Asia/Bangkok',
+          external_url TEXT,
+          external_id TEXT,
+          last_error TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          published_at TIMESTAMPTZ
+        );`,
         // Performance Indexes
+        "CREATE INDEX IF NOT EXISTS idx_audio_jobs_idea ON audio_jobs (idea_id, updated_at DESC);",
+        "CREATE INDEX IF NOT EXISTS idx_audio_segments_job ON audio_segments (job_id, position);",
+        "CREATE INDEX IF NOT EXISTS idx_publishing_jobs_status ON publishing_jobs (status, updated_at DESC);",
         "CREATE INDEX IF NOT EXISTS idx_ideas_parent_task_id ON ideas (parent_task_id);",
         "CREATE INDEX IF NOT EXISTS idx_ideas_active_gate ON ideas (active_gate);",
         "CREATE INDEX IF NOT EXISTS idx_ideas_platform_type ON ideas (platform_type);"
@@ -141,8 +207,8 @@ export async function ensureSchema(sql: any): Promise<void> {
       for (const m of migrations) {
         try {
           await sql.query(m);
-        } catch {
-          // ignore
+        } catch (error) {
+          console.error("Schema migration failed:", error instanceof Error ? error.message : "Unknown database error");
         }
       }
       schemaEnsured = true;
@@ -261,7 +327,10 @@ export async function getAllData(): Promise<{
   const platformChannels: PlatformChannel[] = (platformChannelsRows || []).map((r: any) => ({
     id: r.id,
     channelGroupId: r.channel_group_id || '',
-    platformId: r.platform_id || ''
+    platformId: r.platform_id || '',
+    externalName: r.external_name || '',
+    externalUrl: r.external_url || '',
+    externalChannelId: r.external_channel_id || ''
   }));
 
   const ideas: Idea[] = (ideasRows || []).map((r: any) => ({
@@ -315,6 +384,7 @@ export async function getAllData(): Promise<{
     gate4ApprovedByEmail: r.gate4_approved_by_email || '',
     gate5ApprovedAt: toIsoString(r.gate5_approved_at),
     gate5ApprovedByEmail: r.gate5_approved_by_email || '',
+    gate5ApprovedFinalUrl: r.gate5_approved_final_url || '',
     coreApprovalNotes: r.core_approval_notes || '',
     // Script 4-Column & Copyright (R3)
     scriptData: parseJsonField<ScriptData | undefined>(r.script_data, undefined),
