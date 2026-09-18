@@ -793,11 +793,11 @@ export async function submitVideoWithChecklistAction(
 
     const isAssigned = row.assigned_to_email === member.id;
     const isCore = member.role === "Core";
-    if (!isAssigned && !isCore && member.role !== "P") {
+    if (!isAssigned && !isCore) {
       return { success: false, error: "Chỉ Producer được giao mới có quyền bàn giao video" };
     }
 
-    if (row.status !== "PRODUCTION" && row.active_gate !== "GATE_3_PRODUCTION") {
+    if (row.status !== "PRODUCTION" || row.active_gate !== "GATE_3_PRODUCTION") {
       return { success: false, error: "Chỉ có thể nộp video khi task đang ở Cổng 3 (PRODUCTION)" };
     }
 
@@ -816,12 +816,13 @@ export async function submitVideoWithChecklistAction(
       };
     }
 
-    // Production checklist validation (all 7 items must be checked) (R2 & R4)
+    // Source, audio and visual are parallel branches in the operating map.
+    // They must all be complete before assembly can be handed to Editor QC.
     const prodChecklist = parseJsonSafe<ChecklistItem[]>(row.production_checklist, []);
-    if (!Array.isArray(prodChecklist) || prodChecklist.length < 7) {
+    if (!Array.isArray(prodChecklist) || prodChecklist.length === 0) {
       return {
         success: false,
-        error: "Chưa hoàn thành Production Checklist (yêu cầu đủ 7 tiêu chí). Vui lòng kiểm tra và tích đủ tất cả các mục trước khi nộp."
+        error: "Chưa có Production Checklist. Hãy kiểm tra Source, Voice/Audio, Visual và Self-QC trước khi nộp."
       };
     }
 
@@ -829,7 +830,7 @@ export async function submitVideoWithChecklistAction(
     if (uncheckedItems.length > 0) {
       return {
         success: false,
-        error: `Chưa hoàn thành 100% Production Checklist (còn ${uncheckedItems.length}/7 tiêu chí chưa hoàn thành). Vui lòng tích đủ 7 mục trước khi nộp.`
+        error: `Chưa hoàn thành 100% Production Checklist (còn ${uncheckedItems.length}/${prodChecklist.length} tiêu chí). Hãy hoàn tất các nhánh Source, Audio, Visual và Self-QC trước khi bàn giao.`
       };
     }
 
@@ -896,7 +897,7 @@ export async function submitVideoAction(ideaId: string, videoLink?: string) {
 
   const row = await getIdeaRow(ideaId);
   if (!row) throw new Error("Không tìm thấy ý tưởng");
-  if (row.assigned_to_email !== member.id && member.role !== "P" && member.role !== "Core") {
+  if (row.assigned_to_email !== member.id && member.role !== "Core") {
     throw new Error("Chỉ Producer được giao mới có quyền nộp video");
   }
 
@@ -956,7 +957,7 @@ export async function approveGate4QcAction(
     const row = await getIdeaRow(ideaId);
     if (!row) return { success: false, error: "Không tìm thấy ý tưởng" };
 
-    if (row.status !== "QA" && row.active_gate !== "GATE_4_QC") {
+    if (row.status !== "QA" || row.active_gate !== "GATE_4_QC") {
       return { success: false, error: "Chỉ có thể QC video khi task đang ở Cổng 4 (QA/QC)" };
     }
 
@@ -992,7 +993,6 @@ export async function approveGate4QcAction(
          status = 'CORE_REVIEW',
          active_gate = 'GATE_5_CORE',
          video_final_link = $1,
-         published_link = $1,
          gate4_approved_at = $2,
          gate4_approved_by_email = $3,
          credits_qa_by_email = $3
@@ -1065,8 +1065,8 @@ export async function approveGate5CoreAction(
 
     await sql.query(
       `UPDATE ideas SET
-         status = 'COMPLETE',
-         active_gate = 'PUBLISHED',
+       status = 'READY_TO_PUBLISH',
+         active_gate = 'READY_TO_PUBLISH',
          gate5_approved_at = $1,
          gate5_approved_by_email = $2,
          gate5_approved_final_url = video_final_link,
@@ -1081,7 +1081,30 @@ export async function approveGate5CoreAction(
       ]
     );
 
-    await recordAuditLog(ideaId, member.id, "Cổng 5: Core duyệt chốt video -> COMPLETE", {
+    // A Core approval creates a concrete manual publish package. It remains
+    // READY until somebody verifies the public platform URL; scheduling alone
+    // must never turn a task into Published.
+    const packageKey = crypto.createHash("sha256")
+      .update(`${ideaId}:${row.video_final_link}`)
+      .digest("hex");
+    await sql.query(
+      `INSERT INTO publishing_jobs (
+         id, idea_id, platform_channel_id, created_by_email, mode, status,
+         idempotency_key, final_asset_url, title, caption, hashtags, thumbnail
+       ) VALUES ($1, $2, $3, $4, 'MANUAL', 'READY', $5, $6, $7, $8, $9, $10)
+       ON CONFLICT (idea_id) DO UPDATE SET
+         status = 'READY', final_asset_url = EXCLUDED.final_asset_url,
+         title = EXCLUDED.title, caption = EXCLUDED.caption,
+         hashtags = EXCLUDED.hashtags, thumbnail = EXCLUDED.thumbnail,
+         updated_at = NOW()`,
+      [
+        crypto.randomUUID(), ideaId, row.platform_channel_id, member.id, packageKey,
+        row.video_final_link, row.title,
+        row.published_caption || null, row.published_hashtags || null,
+        row.published_thumbnail || null,
+      ]
+    );
+    await recordAuditLog(ideaId, member.id, "Cổng 5: Core duyệt final -> READY_TO_PUBLISH", {
       coreNotes: notes?.trim() || null,
       approvedBy: member.id,
       timestamp: now
@@ -1092,13 +1115,13 @@ export async function approveGate5CoreAction(
         row.assigned_to_email,
         'qa_pass',
         ideaId,
-        `🎉 Core ${member.name} đã phê duyệt chốt video "${row.title}"! Công việc đã hoàn thành.`
+        `🎉 Core ${member.name} đã phê duyệt bản final của "${row.title}". Video đang chờ xuất bản.`
       );
     }
 
     const channelWebhook = await getWebhookUrlForPlatformChannel(row.platform_channel_id);
     await sendDiscordWebhook(
-      `👑 **CORE PHÊ DUYỆT CHỐT:** Video **"${row.title}"** đã được Core **${member.name}** thông qua!\n${notes ? `> Ghi chú: ${notes.trim()}\n` : ''}Trạng thái: HOÀN THÀNH.`,
+      `👑 **CORE PHÊ DUYỆT CHỐT:** Video **"${row.title}"** đã được Core **${member.name}** thông qua!\n${notes ? `> Ghi chú: ${notes.trim()}\n` : ''}Trạng thái: SẴN SÀNG ĐĂNG.`,
       undefined,
       channelWebhook,
       'general'
@@ -1124,7 +1147,7 @@ export async function qaPassAction(ideaId: string, publishedLink: string) {
 
   const row = await getIdeaRow(ideaId);
   if (!row) throw new Error("Không tìm thấy ý tưởng");
-  if (row.active_gate !== "READY_TO_PUBLISH" || !row.gate5_approved_at) {
+  if (row.status !== "READY_TO_PUBLISH" || row.active_gate !== "READY_TO_PUBLISH" || !row.gate5_approved_at) {
     throw new Error("Publish bị khóa cho đến khi Core duyệt chốt ở Cổng 5.");
   }
 
@@ -1142,8 +1165,15 @@ export async function qaPassAction(ideaId: string, publishedLink: string) {
      WHERE id = $4`,
     [publishedLink.trim(), now, member.id, ideaId]
   );
+  await sql.query(
+    `UPDATE publishing_jobs
+     SET status = 'PUBLISHED', external_url = $1, published_at = $2,
+         updated_at = $2, last_error = NULL
+     WHERE idea_id = $3`,
+    [publishedLink.trim(), now, ideaId]
+  );
 
-  await recordAuditLog(ideaId, member.id, "QA Đạt QA -> COMPLETE", { publishedLink: publishedLink.trim() });
+  await recordAuditLog(ideaId, member.id, "Xác nhận video đã public -> PUBLISHED", { publishedLink: publishedLink.trim() });
 
   if (row.assigned_to_email) {
     await createNotification(
@@ -1177,6 +1207,9 @@ export async function qaFailAction(ideaId: string, qaFeedback: string) {
 
   const row = await getIdeaRow(ideaId);
   if (!row) throw new Error("Không tìm thấy ý tưởng");
+  if (row.status !== "QA" || row.active_gate !== "GATE_4_QC") {
+    throw new Error("Chỉ có thể trả video về Production khi đang ở bước Editor QC.");
+  }
 
   const sql = getDb();
   await sql.query(
@@ -1337,17 +1370,12 @@ export async function createTikTokDerivativeAction(
     const master = await getIdeaRow(masterIdeaId);
     if (!master) return { success: false, error: "Không tìm thấy video YouTube Master" };
 
-    const isApprovedMaster = 
-      master.active_gate === "GATE_5_CORE" || 
-      master.active_gate === "READY_TO_PUBLISH" || 
-      master.active_gate === "PUBLISHED" || 
-      master.status === "COMPLETE" || 
-      Boolean(master.gate4_approved_at);
+    const isApprovedMaster = master.active_gate === "PUBLISHED" && master.status === "COMPLETE";
 
     if (!isApprovedMaster) {
       return { 
         success: false, 
-        error: "Chỉ có thể tạo task phái sinh TikTok từ video Master đã qua duyệt QC hoặc hoàn thành." 
+        error: "Chỉ có thể tạo task phái sinh TikTok sau khi video Master đã public và có URL chính thức."
       };
     }
 

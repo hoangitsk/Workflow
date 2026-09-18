@@ -291,6 +291,17 @@ async function initSchema() {
     );
   `);
 
+  await sql.query(`
+    CREATE TABLE IF NOT EXISTS auth_sessions (
+      id VARCHAR(100) PRIMARY KEY,
+      member_id VARCHAR(255) NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      revoked_at TIMESTAMPTZ
+    );
+  `);
+  await sql.query(`CREATE INDEX IF NOT EXISTS idx_auth_sessions_member ON auth_sessions (member_id, expires_at DESC);`);
+
   // Add new columns if they don't exist
   try {
     await sql.query(`ALTER TABLE pitching_batches ADD COLUMN category TEXT;`);

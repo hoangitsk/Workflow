@@ -151,3 +151,19 @@ Mỗi checkpoint mới cần ghi: ngày; ID công việc; file; trạng thái tr
 - **Khóa phiên bản**: Gate 5 chụp `gate5_approved_final_url`; sau Core duyệt không thể thay final trong publish package hoặc upload đè. Muốn thay phải quay lại QC/Core.
 - **Kiểm tra**: `npx tsc --noEmit` PASS; ESLint các file mới/đã chạm trong phạm vi PASS; unit smoke chia 321 từ thành 140/140/41 và URL YouTube/TikTok PASS; `npm run build` PASS; DB thật đã có `audio_jobs`, `audio_segments`, `publishing_jobs` và các cột snapshot/destination. Build còn warning filesystem tracing cũ của `/api/media`.
 - **Chưa nghiệm thu ngoài**: chưa có TTS/model thật hoạt động, chưa có OAuth YouTube/TikTok, chưa đăng video thật. Kiểm tra browser dừng ở màn hình đăng nhập vì không dùng/đọc thông tin xác thực của người dùng.
+
+## 12. Checkpoint đồng bộ logic theo Bản đồ vận hành video (18/09/2026)
+
+- **Phạm vi**: chuẩn hóa các điểm chuyển bắt buộc của sơ đồ: Source + Audio + Visual -> Assembly/Self-QC -> Editor QC -> Core -> Publish -> Analytics/Feedback.
+- **Đã sửa**:
+  - Core duyệt final nay chuyển task sang `READY_TO_PUBLISH`; không còn đánh dấu hoàn thành/published trước khi đăng.
+  - Editor QC chỉ lưu `video_final_link`; không còn ghi nhầm final nội bộ thành `published_link`.
+  - Xác nhận Published yêu cầu URL public sau Core duyệt, cập nhật task sang `COMPLETE/PUBLISHED` và cập nhật `publishing_jobs` sang `PUBLISHED`.
+  - Core duyệt tạo/cập nhật một publish package thủ công, idempotent theo task + bản final, trạng thái `READY`; hẹn lịch không được coi là Published.
+  - Checklist Production mới tách rõ Source, Voice/Audio, Visual, Assembly/Self-QC và bàn giao source; Producer không được giao không thể nộp hộ task.
+  - Sửa điều kiện gate QC dùng `OR` để không thể vượt gate khi chỉ đúng một trong status/gate; trả revision chỉ hợp lệ từ Editor QC.
+  - TikTok derivative chỉ được tạo sau khi master đã thật sự `PUBLISHED`.
+  - Thay cookie chứa email bằng session ID ngẫu nhiên, lưu server-side có hạn/revoke; trang chủ không query/serialize dữ liệu workspace trước khi session hợp lệ.
+- **Schema**: thêm `auth_sessions` vào cả `ensureSchema()` và `init-postgres.mjs`.
+- **Kiểm tra**: `npm run build` PASS (Next.js 16.3.2). Còn warning cũ về dynamic filesystem tracing trong `/api/media`. `npx tsc --noEmit` hiện bị cache `.next/dev` cũ tham chiếu `/huong-dan` không tồn tại trong source/HEAD; build production không tái hiện lỗi này. ESLint toàn các file liên quan vẫn có lỗi tồn tại sẵn do `any` và JSX trong code legacy, không dùng làm bằng chứng PASS.
+- **Bước tiếp theo**: tạo UI quản lý đầy đủ publish package (metadata, lịch, destination) và test tích hợp DB cho session/gate/retry trước khi bật OAuth hoặc upload thật.

@@ -1,10 +1,11 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { getDb } from "../lib/db";
+import { ensureSchema, getDb } from "../lib/db";
 import { Member } from "../lib/types";
 
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 const loginAttempts = new Map<string, { count: number, lastTry: number }>();
 const MAX_ATTEMPTS = 5;
@@ -23,6 +24,7 @@ export async function loginWithCredentialsAction(emailOrUsername: string, passwo
     }
 
     const sql = getDb();
+    await ensureSchema(sql);
     const rows = await sql.query(
       `SELECT * FROM members WHERE LOWER(TRIM(id)) = $1 OR (username IS NOT NULL AND LOWER(TRIM(username)) = $1) LIMIT 1`,
       [query]
@@ -70,11 +72,19 @@ export async function loginWithCredentialsAction(emailOrUsername: string, passwo
     // Success, reset attempts
     loginAttempts.delete(query);
 
+    const sessionId = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await sql.query(
+      "INSERT INTO auth_sessions (id, member_id, expires_at) VALUES ($1, $2, $3)",
+      [sessionId, member.id, expiresAt.toISOString()]
+    );
     const cookieStore = await cookies();
-    cookieStore.set("currentMemberEmail", member.id, { 
-      path: "/", 
+    // Retain the cookie name so existing browsers are safely replaced, but never put an identity in it.
+    cookieStore.set("currentMemberEmail", sessionId, {
+      path: "/",
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
       maxAge: 60 * 60 * 24 * 7
     });
     
@@ -93,17 +103,34 @@ function recordFailure(query: string, attempt: { count: number, lastTry: number 
 
 export async function logoutAction() {
   const cookieStore = await cookies();
+  const sessionId = cookieStore.get("currentMemberEmail")?.value;
+  if (sessionId) {
+    try {
+      const sql = getDb();
+      await ensureSchema(sql);
+      await sql.query("UPDATE auth_sessions SET revoked_at = NOW() WHERE id = $1", [sessionId]);
+    } catch (error) {
+      console.error("Không thể thu hồi phiên:", error instanceof Error ? error.message : "Unknown error");
+    }
+  }
   cookieStore.delete("currentMemberEmail");
 }
 
 export async function getCurrentMember(): Promise<Member | null> {
   const cookieStore = await cookies();
-  const email = cookieStore.get("currentMemberEmail")?.value;
-  if (!email) return null;
+  const sessionId = cookieStore.get("currentMemberEmail")?.value;
+  if (!sessionId) return null;
   
   try {
     const sql = getDb();
-    const rows = await sql.query(`SELECT * FROM members WHERE id = $1 LIMIT 1`, [email]);
+    await ensureSchema(sql);
+    const rows = await sql.query(
+      `SELECT m.* FROM auth_sessions s
+       JOIN members m ON m.id = s.member_id
+       WHERE s.id = $1 AND s.revoked_at IS NULL AND s.expires_at > NOW()
+       LIMIT 1`,
+      [sessionId]
+    );
     const member = rows[0] as any;
     
     if (!member) return null;

@@ -151,7 +151,7 @@ export async function createTikTokCutdownAction(ideaId: string, params: {
     const parentRows = await sql.query(`SELECT * FROM ideas WHERE id = $1 LIMIT 1`, [ideaId]);
     const parent = parentRows[0];
     if (!parent) return { success: false, error: "Không tìm thấy ý tưởng gốc" };
-    if (parent.status !== "READY_TO_PUBLISH" && parent.active_gate !== "READY_TO_PUBLISH") {
+    if (parent.status !== "COMPLETE" || parent.active_gate !== "PUBLISHED") {
       return { success: false, error: "Chỉ tạo TikTok khi video đã publish" };
     }
 

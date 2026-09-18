@@ -100,7 +100,7 @@ const STATUS_LABEL: Record<string, string> = {
   PRODUCTION: "Đang sản xuất",
   QA: "Chờ duyệt QA",
   CORE_REVIEW: "Chờ Core duyệt",
-  READY_TO_PUBLISH: "Chờ hoàn tất",
+  READY_TO_PUBLISH: "Sẵn sàng đăng",
   COMPLETE: "Đã hoàn tất",
   ARCHIVED_IDEA: "Lưu trữ",
   CANCELLED: "Đã huỷ"
@@ -1489,7 +1489,7 @@ export default function ClientApp({
 
       {/* QA PASS MODAL */}
       {qaCompleteIdeaTarget && (
-        <Modal title={`Kiểm duyệt ĐẠT: ${qaCompleteIdeaTarget.title}`} onClose={() => setQaCompleteIdeaTarget(null)}>
+        <Modal title={`Xác nhận đã xuất bản: ${qaCompleteIdeaTarget.title}`} onClose={() => setQaCompleteIdeaTarget(null)}>
           <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
             e.preventDefault();
             const form = e.currentTarget;
@@ -1497,21 +1497,21 @@ export default function ClientApp({
             
             runAction(qaPassAction, qaCompleteIdeaTarget.id, publishedLink);
             setQaCompleteIdeaTarget(null);
-            showToast("Đã xác nhận QA ĐẠT và cập nhật link lưu trữ sản phẩm");
+            showToast("Đã xác nhận video đã public và lưu URL chính thức");
           }}>
             <div className="space-y-3">
               <div className="p-3 rounded-lg bg-emerald-50 text-emerald-800 text-xs border border-emerald-200">
-                🎉 Bạn đang xác nhận video đạt chuẩn chất lượng. Vui lòng nhập link lưu trữ sản phẩm cuối.
+                🎉 Core đã duyệt bản final. Chỉ xác nhận sau khi video đã công khai thật trên nền tảng; hẹn lịch chưa phải Published.
               </div>
               <div>
-                <FieldLabel required>Link lưu trữ sản phẩm cuối</FieldLabel>
-                <TextInput id="publishedLink" autoFocus required placeholder="https://drive.google.com/file/..." defaultValue={qaCompleteIdeaTarget.publishedLink || ""} />
+                <FieldLabel required>URL video đã public</FieldLabel>
+                <TextInput id="publishedLink" autoFocus required placeholder="https://www.youtube.com/watch?v=..." defaultValue={qaCompleteIdeaTarget.publishedLink || ""} />
               </div>
             </div>
 
             <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-slate-100">
               <Btn onClick={() => setQaCompleteIdeaTarget(null)}>Huỷ</Btn>
-              <Btn tone="success" type="submit" loading={isPending}>Xác nhận QA Đạt</Btn>
+              <Btn tone="success" type="submit" loading={isPending}>Xác nhận Published</Btn>
             </div>
           </form>
         </Modal>
@@ -3716,7 +3716,7 @@ function YndaWorkflowPanel({ idea, actor, runAction }: any) {
     {gate === "GATE_3_PRODUCTION" && <><>{checklist("production", idea.productionChecklist, "Production checklist · phải hoàn tất trước bàn giao")}</><div className="grid grid-cols-2 gap-2"><TextInput value={draftLink} onChange={(e:any) => setDraftLink(e.target.value)} placeholder="Link video draft *"/><TextInput value={sourceLink} onChange={(e:any) => setSourceLink(e.target.value)} placeholder="Link source project *"/></div><Btn small tone="primary" onClick={() => runAction(submitVideoWithChecklistAction, idea.id, { videoDraftLink: draftLink, sourceProjectLink: sourceLink, assetFolderLink: idea.assetFolderLink || "" })}><Upload size={12}/> Bàn giao sang QC</Btn></>}
     {gate === "GATE_4_QC" && <><>{checklist("qc", idea.qcChecklist, "Editor QC checklist · Editor hoàn thiện trực tiếp")}</><TextInput value={finalLink} onChange={(e:any) => setFinalLink(e.target.value)} placeholder="Link video final sau QC"/>{isEditor && <Btn small tone="success" onClick={() => runAction(approveGate4QcAction, idea.id, finalLink)}><ShieldCheck size={12}/> Gửi Core duyệt</Btn>}</>}
     {gate === "GATE_5_CORE" && actor.role === "Core" && <Btn small tone="primary" onClick={() => runAction(approveGate5CoreAction, idea.id, "Duyệt chốt từ SOP console")}><CheckCircle2 size={12}/> Core duyệt chốt</Btn>}
-    {gate === "READY_TO_PUBLISH" && <p className="text-xs text-slate-600">Công việc cũ đang chờ hoàn tất. Từ nay Core duyệt chốt ở Cổng 5 sẽ tự khép công việc, không còn bước đăng lên nền tảng.</p>}
+    {gate === "READY_TO_PUBLISH" && <div className="rounded-lg border border-teal-200 bg-teal-50 p-3 text-xs text-teal-900"><b>Gói đăng đã sẵn sàng.</b> Đối chiếu đúng bản final Core duyệt, đăng/hẹn lịch trên nền tảng, kiểm tra URL ở cửa sổ ẩn danh rồi dùng nút “Xác nhận Published” tại bảng việc để khép vòng đời.</div>}
     {gate === "PUBLISHED" && <PublishedTools idea={idea} actor={actor} runAction={runAction} />}
   </section>;
 }

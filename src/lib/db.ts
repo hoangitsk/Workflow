@@ -137,6 +137,15 @@ export async function ensureSchema(sql: any): Promise<void> {
         "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS metrics_ctr VARCHAR(50);",
         "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS metrics_comments INT DEFAULT 0;",
         "ALTER TABLE ideas ADD COLUMN IF NOT EXISTS metrics_insights TEXT;",
+        // Opaque, revocable server-side sessions. The browser only receives a random token.
+        `CREATE TABLE IF NOT EXISTS auth_sessions (
+          id VARCHAR(100) PRIMARY KEY,
+          member_id VARCHAR(255) NOT NULL,
+          expires_at TIMESTAMPTZ NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          revoked_at TIMESTAMPTZ
+        );`,
+        "CREATE INDEX IF NOT EXISTS idx_auth_sessions_member ON auth_sessions (member_id, expires_at DESC);",
         // Persistent audio workflow. Audio bytes stay private in Postgres so a reload does not lose outputs.
         `CREATE TABLE IF NOT EXISTS audio_jobs (
           id VARCHAR(100) PRIMARY KEY,

@@ -271,13 +271,15 @@ export interface ChecklistItem {
 }
 
 export const DEFAULT_PRODUCTION_CHECKLIST: ChecklistItem[] = [
-  { id: "prod_voice", label: "Voice rõ ràng, phát âm chuẩn, không tạp âm/nhiễu", checked: false },
-  { id: "prod_footage", label: "Footage bám sát script và có ghi rõ nguồn tư liệu", checked: false },
-  { id: "prod_bgm", label: "BGM & SFX đã kiểm tra quyền sử dụng, không vi phạm bản quyền", checked: false },
-  { id: "prod_subtitle", label: "Subtitle đúng chính tả, nằm trong vùng an toàn (safe zone)", checked: false },
-  { id: "prod_format", label: "Định dạng chuẩn master ngang YouTube 16:9 (2 - 5 phút)", checked: false },
-  { id: "prod_metadata", label: "Có đề xuất thumbnail, title và caption/hashtag", checked: false },
-  { id: "prod_source", label: "Đã xuất đầy đủ file source/project để Editor tiếp quản chỉnh sửa", checked: false }
+  { id: "prod_source_ready", label: "Source/footage, hình và tài liệu đã đủ, bám script và ghi rõ nguồn sử dụng", checked: false },
+  { id: "prod_voice_ready", label: "Voice đã nghe lại: phát âm chuẩn, ngắt câu tự nhiên, không tạp âm/nhiễu", checked: false },
+  { id: "prod_audio_mix", label: "BGM & SFX có quyền sử dụng, không lấn voice và không clipping", checked: false },
+  { id: "prod_visual_ready", label: "Visual/graphic/mascot đã đủ cho từng phân cảnh, đúng tỉ lệ và không lỗi frame", checked: false },
+  { id: "prod_subtitle", label: "Subtitle đúng chính tả, timing và nằm trong vùng an toàn (safe zone)", checked: false },
+  { id: "prod_script_alignment", label: "Đã xem 100% ở tốc độ 1x, hình/tiếng bám đúng script đã khóa", checked: false },
+  { id: "prod_format", label: "File export đúng định dạng của kênh/nền tảng", checked: false },
+  { id: "prod_metadata", label: "Đã chuẩn bị đề xuất thumbnail, title, caption và hashtag", checked: false },
+  { id: "prod_source_handover", label: "Folder source/project đầy đủ và Editor có quyền tiếp quản chỉnh sửa", checked: false }
 ];
 
 export const DEFAULT_QC_CHECKLIST: ChecklistItem[] = [

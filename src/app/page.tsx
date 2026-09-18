@@ -53,10 +53,13 @@ export default async function Page() {
     pitchingBatches: []
   };
 
-  try {
-    const data = await getAllData();
-    if (data) {
-      initialData = {
+  // Workspace data is private. Do not query or serialize it until a server-side
+  // session has been verified; ClientApp then renders the login form.
+  if (currentMember) {
+    try {
+      const data = await getAllData();
+      if (data) {
+        initialData = {
         members: Array.isArray(data.members) ? data.members : [],
         platforms: Array.isArray(data.platforms) ? data.platforms : [],
         channelGroups: Array.isArray(data.channelGroups) ? data.channelGroups : [],
@@ -68,10 +71,11 @@ export default async function Page() {
         checklists: Array.isArray(data.checklists) ? data.checklists : [],
         settings: data.settings || { discordWebhookUrl: '', discordIdeaWebhookUrl: '', externalCalendarUrl: '', discordMuted: false },
         pitchingBatches: Array.isArray(data.pitchingBatches) ? data.pitchingBatches : []
-      };
+        };
+      }
+    } catch (err) {
+      console.error("Lỗi nạp dữ liệu Postgres:", err);
     }
-  } catch (err) {
-    console.error("Lỗi nạp dữ liệu Postgres:", err);
   }
 
   return (
@@ -91,4 +95,3 @@ export default async function Page() {
     />
   );
 }
-
